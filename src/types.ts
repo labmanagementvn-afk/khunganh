@@ -28,6 +28,8 @@ export interface TextElement {
   stroke: string;
   strokeWidth: number;
   uppercase: boolean;
+  /** Khoảng cách giữa các ký tự (px) */
+  letterSpacing?: number;
 }
 
 export interface Rect {

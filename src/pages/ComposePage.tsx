@@ -1,7 +1,7 @@
 import Konva from 'konva';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Group, Image as KImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ResultModal } from '../components/ResultModal';
 import { SettingsPanel } from '../components/SettingsPanel';
 import { TextNode, createTextElement } from '../components/TextNode';
@@ -62,8 +62,17 @@ interface ComposeDoc {
 
 const labelOf = (t: TextElement) => (t.label || 'Text nhập').trim();
 
+/** Giá trị ban đầu của các ô nhập = giá trị mặc định đặt trong khung mẫu */
+function defaultValues(texts: TextElement[]): Record<string, string> {
+  const v: Record<string, string> = {};
+  texts.filter((x) => x.kind === 'input').forEach((x) => (v[labelOf(x)] ??= x.text));
+  return v;
+}
+
 export default function ComposePage() {
   const { id } = useParams();
+  const [params, setParams] = useSearchParams();
+  const fromPreset = params.get('new') === '1';
   const user = useUser();
 
   const [tpl, setTpl] = useState<Template | null>(null);
@@ -106,8 +115,7 @@ export default function ComposePage() {
         if (!t) throw new Error('Không tìm thấy khung mẫu');
         if (!alive) return;
         setTpl(t);
-        const init: Record<string, string> = {};
-        t.texts.filter((x) => x.kind === 'input').forEach((x) => (init[labelOf(x)] ??= ''));
+        const init = defaultValues(t.texts);
         history.reset({ photo: null, values: init, texts: t.texts, extras: [] });
         if (t.frame) {
           const img = await blobToImage(await backend.getBlob(user.uid, t.frame.blobId));
@@ -323,7 +331,7 @@ export default function ComposePage() {
     history.set((d) => ({
       ...d,
       photo: null,
-      values: Object.fromEntries(Object.keys(d.values).map((k) => [k, ''])),
+      values: defaultValues(d.texts),
     }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -398,6 +406,19 @@ export default function ComposePage() {
           ✎ Sửa khung
         </Link>
       </div>
+      {fromPreset && (
+        <div className="banner">
+          <span>✓ Đã thêm “{tpl.name}” vào Khung mẫu của bạn. Bạn có thể sửa chữ, màu, vị trí bất kỳ lúc nào.</span>
+          <span className="row">
+            <Link className="btn sm" to={`/templates/${tpl.id}/edit`}>
+              ✎ Sửa khung
+            </Link>
+            <button className="icon-btn" aria-label="Đóng" onClick={() => setParams({}, { replace: true })}>
+              ✕
+            </button>
+          </span>
+        </div>
+      )}
       {error && <p className="error">{error}</p>}
 
       <div className="layout">

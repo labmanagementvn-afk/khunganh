@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { PresetGallery } from '../components/PresetGallery';
 import { backend } from '../lib/backend';
 import { useUser } from '../lib/auth';
 import type { Template } from '../types';
@@ -37,9 +38,12 @@ export default function HomePage() {
       {items && items.length === 0 && (
         <div className="card empty">
           <h3>Chưa có khung mẫu nào</h3>
-          <p className="muted">Tạo khung đầu tiên: tải ảnh khung, đặt vùng ảnh sản phẩm, thêm chữ "Mã sản phẩm" và ô nhập mã.</p>
-          <Link to="/templates/new" className="btn primary lg">
-            ＋ Tạo khung đầu tiên
+          <p className="muted">
+            Chọn một mẫu có sẵn bên dưới, hoặc tự tạo khung: tải ảnh khung, đặt vùng ảnh sản phẩm, thêm chữ "Mã sản phẩm" và ô
+            nhập mã.
+          </p>
+          <Link to="/templates/new" className="btn lg">
+            ＋ Tự tạo khung
           </Link>
         </div>
       )}
@@ -69,6 +73,7 @@ export default function HomePage() {
           </div>
         ))}
       </div>
+      <PresetGallery />
     </div>
   );
 }

@@ -178,3 +178,8 @@ input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--primary)
 .panel.settings { border: 1.5px solid var(--primary); box-shadow: 0 0 0 3px var(--primary-soft), var(--shadow); }
 .settings-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px -6px -4px 0; }
 .settings-head h3 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.presets { margin-top: 28px; }
+.presets h2 { font-size: 1.2rem; }
+.clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
+.tpl-thumb:disabled { cursor: progress; }
+.banner { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; font-size: 0.92rem; }
