@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from '../components/Icon';
 import { Link, useParams } from 'react-router-dom';
 import { FilterPicker } from '../components/PhotoAdjustPanels';
 import { useSession } from '../lib/auth';
@@ -165,7 +166,7 @@ export default function BatchPage() {
     }
     const toSave = guest ? 0 : Math.min(items.length, HISTORY_LIMIT);
     setNotice(
-      `✓ Đã tạo ${items.length} ảnh. ` +
+      `Đã tạo ${items.length} ảnh. ` +
         (guest
           ? 'Bạn chưa đăng nhập nên ảnh không được lưu lịch sử – nhớ lưu ảnh về máy.'
           : saved === toSave
@@ -195,7 +196,7 @@ export default function BatchPage() {
   return (
     <div className="page">
       <div className="toolbar">
-        <h1 className="grow ellipsis">📚 Tạo hàng loạt · {tpl.name}</h1>
+        <h1 className="grow ellipsis"><Icon name="layers" /> Tạo hàng loạt · {tpl.name}</h1>
         <Link className="btn ghost sm" to={`/compose/${tpl.id}`}>
           Tạo từng ảnh
         </Link>
@@ -207,7 +208,7 @@ export default function BatchPage() {
           <div className="panel">
             <div className="row wrap">
               <button className="btn primary lg grow" onClick={() => fileInput.current?.click()} disabled={busy}>
-                🖼️ {items.length ? 'Thêm ảnh' : 'Chọn nhiều ảnh'}
+                <Icon name="image" /> {items.length ? 'Thêm ảnh' : 'Chọn nhiều ảnh'}
               </button>
               {items.length > 0 && (
                 <button className="btn ghost" disabled={busy} onClick={() => confirm('Bỏ tất cả ảnh đã chọn?') && setItems([])}>
@@ -231,7 +232,7 @@ export default function BatchPage() {
                   <div className="batch-thumb">
                     {it.preview ? <img src={it.preview} alt="" /> : <span className="spinner small" />}
                     <span className="batch-index">{idx + 1}</span>
-                    {it.result && <span className="batch-done">✓</span>}
+                    {it.result && <span className="batch-done"><Icon name="check" /> </span>}
                   </div>
                   <div className="batch-fields">
                     <small className="muted ellipsis">{it.name}</small>
@@ -251,7 +252,7 @@ export default function BatchPage() {
                         </button>
                       </div>
                       <button className="btn ghost sm" title="Xoay 90°" onClick={() => updateItem(it.id, { rotation: (it.rotation + 90) % 360 })}>
-                        ⟳
+                        <Icon name="rotate" /> 
                       </button>
                       <button
                         className="btn ghost sm"
@@ -259,7 +260,7 @@ export default function BatchPage() {
                         disabled={busy}
                         onClick={() => setItems((xs) => xs.filter((x) => x.id !== it.id))}
                       >
-                        🗑
+                        <Icon name="trash" /> 
                       </button>
                     </div>
                     {it.error && <small className="error">{it.error}</small>}
@@ -303,15 +304,15 @@ export default function BatchPage() {
             <h3>Áp dụng cho tất cả ảnh</h3>
             <div className="seg tabs">
               <button className={fit === 'cover' ? 'on' : ''} onClick={() => { setFit('cover'); setItems((xs) => xs.map((x) => ({ ...x, fit: 'cover' }))); }}>
-                ⛶ Lấp đầy khung
+                <Icon name="maximize" /> Lấp đầy khung
               </button>
               <button className={fit === 'contain' ? 'on' : ''} onClick={() => { setFit('contain'); setItems((xs) => xs.map((x) => ({ ...x, fit: 'contain' }))); }}>
-                ▣ Hiện toàn bộ ảnh
+                <Icon name="minimize" /> Hiện toàn bộ ảnh
               </button>
             </div>
             <label className="check">
               <input type="checkbox" checked={beautify} onChange={(e) => setBeautify(e.target.checked)} />
-              ✨ Làm đẹp tự động từng ảnh
+              <Icon name="wand" /> Làm đẹp tự động từng ảnh
             </label>
             {items[0] && (
               <>
@@ -329,7 +330,7 @@ export default function BatchPage() {
           </div>
 
           <button className="btn primary lg block" disabled={!items.length || busy || loadingFiles > 0} onClick={generateAll}>
-            {busy ? `Đang tạo ${progress!.done}/${progress!.total}…` : `⚡ Tạo ${items.length || ''} ảnh`}
+            {busy ? `Đang tạo ${progress!.done}/${progress!.total}…` : <><Icon name="play" /> Tạo {items.length || ''} ảnh</>}
           </button>
           {progress && (
             <div className="progress">
@@ -346,11 +347,11 @@ export default function BatchPage() {
           <div className="row wrap">
             {canShareFiles() && (
               <button className="btn primary" onClick={shareAll}>
-                📲 Lưu tất cả vào Ảnh / Chia sẻ
+                <Icon name="share" /> Lưu tất cả vào Ảnh / Chia sẻ
               </button>
             )}
             <button className={canShareFiles() ? 'btn' : 'btn primary'} onClick={downloadZip}>
-              ⬇️ Tải tất cả (.zip)
+              <Icon name="download" /> Tải tất cả (.zip)
             </button>
           </div>
           <div className="grid">
@@ -360,7 +361,7 @@ export default function BatchPage() {
                 <div className="tpl-actions">
                   <small className="muted ellipsis grow">{r.filename}</small>
                   <button className="btn ghost sm" title="Tải ảnh này" onClick={() => downloadBlob(r.blob, r.filename)}>
-                    ⬇️
+                    <Icon name="download" /> 
                   </button>
                 </div>
               </div>

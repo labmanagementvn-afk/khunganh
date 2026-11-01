@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Icon } from '../components/Icon';
 import { Link } from 'react-router-dom';
 import { ResultModal } from '../components/ResultModal';
 import { useSession } from '../lib/auth';
@@ -94,10 +95,10 @@ export default function HistoryPage() {
             </div>
             <div className="history-actions">
               <Link className="btn ghost sm" to={e.templateId === 'collage' ? '/collage' : `/compose/${e.templateId}`} title="Dùng lại khung">
-                ↻
+                <Icon name="reset" /> 
               </Link>
               <button className="btn ghost sm" onClick={() => remove(e)} title="Xoá">
-                🗑
+                <Icon name="trash" /> 
               </button>
             </div>
           </div>
@@ -113,7 +114,7 @@ export default function HistoryPage() {
           onClose={() => setOpen(null)}
           extraAction={
             <button className="btn danger" onClick={() => remove(open.entry)}>
-              🗑 Xoá
+              <Icon name="trash" /> Xoá
             </button>
           }
         />

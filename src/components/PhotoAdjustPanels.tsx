@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Icon } from './Icon';
 import { DEFAULT_ADJUST, FILTERS, FILTER_IDS, autoBeautify, isIdentity, renderAdjusted, type PhotoAdjust } from '../lib/photoFilters';
 
 interface Props {
@@ -70,14 +71,14 @@ export function AdjustSliders({ img, adjust, onChange }: Props) {
     <>
       <div className="row wrap">
         <button className="btn primary sm grow" onClick={() => onChange(autoBeautify(img, adjust))}>
-          ✨ Làm đẹp tự động
+          <Icon name="wand" /> Làm đẹp tự động
         </button>
         <button
           className="btn ghost sm"
           disabled={isIdentity({ ...adjust, filter: 'none' })}
           onClick={() => onChange({ ...DEFAULT_ADJUST, filter: adjust.filter, filterStrength: adjust.filterStrength })}
         >
-          ↺ Đặt lại
+          <Icon name="reset" /> Đặt lại
         </button>
       </div>
       {SLIDERS.map(({ key, label, min }) => (

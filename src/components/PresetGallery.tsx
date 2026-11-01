@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Icon } from './Icon';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../lib/auth';
 import { PRESETS, PRESET_CATEGORIES, type Preset } from '../presets/presets';
@@ -32,7 +33,7 @@ function PresetCard({ preset, busy, disabled, onUse }: { preset: Preset; busy: b
   );
 }
 
-const BIG_PHOTO = '🖼️ Ảnh lớn';
+const BIG_PHOTO = 'Ảnh lớn';
 
 /** Thư viện khung mẫu có sẵn: chọn một mẫu sẽ tạo bản sao vào "Khung mẫu của tôi" */
 export function PresetGallery() {
@@ -63,7 +64,7 @@ export function PresetGallery() {
   return (
     <section className="presets">
       <div className="toolbar">
-        <h2 className="grow">✨ Mẫu có sẵn</h2>
+        <h2 className="grow"><Icon name="wand" /> Mẫu có sẵn</h2>
       </div>
       <p className="hint">Chọn một mẫu để tạo khung của riêng bạn – sau đó có thể đổi chữ, màu, vị trí tuỳ ý.</p>
       <div className="chips">

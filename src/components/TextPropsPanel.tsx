@@ -1,4 +1,5 @@
 import { FONTS } from '../lib/fonts';
+import { Icon } from './Icon';
 import type { FontStyle, TextElement } from '../types';
 
 interface Props {
@@ -138,25 +139,25 @@ export function TextPropsPanel({ el, canvasWidth, allowKind, onChange, onDelete,
 
       <div className="row wrap">
         <button className="btn ghost sm" onClick={() => onChange({ x: Math.round((canvasWidth - el.width) / 2) })}>
-          ↔ Căn giữa ngang
+          <Icon name="center" /> Căn giữa ngang
         </button>
         {el.rotation !== 0 && (
           <button className="btn ghost sm" onClick={() => onChange({ rotation: 0 })}>
-            ⟲ Bỏ xoay
+            <Icon name="reset" /> Bỏ xoay
           </button>
         )}
         {onReset && (
           <button className="btn ghost sm" onClick={onReset}>
-            ↺ Như khung mẫu
+            <Icon name="reset" /> Như khung mẫu
           </button>
         )}
         {onDuplicate && (
           <button className="btn ghost sm" onClick={onDuplicate}>
-            ⧉ Nhân bản
+            <Icon name="copy" /> Nhân bản
           </button>
         )}
         <button className="btn danger sm" onClick={onDelete}>
-          🗑 Xoá text
+          <Icon name="trash" /> Xoá text
         </button>
       </div>
     </div>

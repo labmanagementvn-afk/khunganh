@@ -1,4 +1,6 @@
 import Konva from 'konva';
+import { CANVAS_UI } from '../lib/theme';
+import { Icon } from '../components/Icon';
 import { useEffect, useRef, useState } from 'react';
 import { Group, Image as KImage, Layer, Rect, Shape, Stage, Text, Transformer } from 'react-konva';
 import { useSearchParams } from 'react-router-dom';
@@ -373,9 +375,9 @@ export default function CollagePage() {
   return (
     <div className="page editor">
       <div className="toolbar">
-        <h1 className="grow">🧩 Ghép ảnh</h1>
+        <h1 className="grow"><Icon name="grid" /> Ghép ảnh</h1>
         <button className="btn primary" onClick={() => multiInput.current?.click()}>
-          ＋ Thêm ảnh
+          <Icon name="plus" /> Thêm ảnh
         </button>
       </div>
       {error && <p className="error">{error}</p>}
@@ -417,17 +419,17 @@ export default function CollagePage() {
                         />
                       ) : (
                         <Group name="ui" onClick={() => onCellTap(i)} onTap={() => onCellTap(i)}>
-                          <Rect {...b} fill="#eef0ff" />
+                          <Rect {...b} fill={CANVAS_UI.placeholder} />
                           <Text
                             x={g.center.x - 60 / scale}
                             y={g.center.y - 18 / scale}
                             width={120 / scale}
                             align="center"
-                            text={`＋\nẢnh ${i + 1}`}
+                            text={`+\nẢnh ${i + 1}`}
                             fontSize={18 / scale}
                             lineHeight={1.2}
                             fontStyle="bold"
-                            fill="#4f46e5"
+                            fill={CANVAS_UI.placeholderText}
                           />
                         </Group>
                       )}
@@ -459,7 +461,7 @@ export default function CollagePage() {
                         g.trace(ctx);
                         ctx.strokeShape(shape);
                       }}
-                      stroke={selCell === i ? '#4f46e5' : '#f59e0b'}
+                      stroke={selCell === i ? CANVAS_UI.accent : CANVAS_UI.swapTarget}
                       strokeWidth={3 / scale}
                       dash={swapFrom !== null && selCell !== i ? [8 / scale, 6 / scale] : undefined}
                       listening={false}
@@ -481,8 +483,8 @@ export default function CollagePage() {
                   enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right']}
                   anchorSize={14}
                   anchorCornerRadius={4}
-                  borderStroke="#4f46e5"
-                  anchorStroke="#4f46e5"
+                  borderStroke={CANVAS_UI.accent}
+                  anchorStroke={CANVAS_UI.accent}
                 />
               </Layer>
             </Stage>
@@ -521,7 +523,7 @@ export default function CollagePage() {
           {extra > 0 && <p className="hint">Còn {extra} ảnh chưa có ô – chọn bố cục nhiều ô hơn để hiện thêm.</p>}
 
           {selPhoto && selCell !== null ? (
-            <SettingsPanel title={`📷 Ảnh ${selCell + 1}`} onClose={() => setSelected(null)}>
+            <SettingsPanel title={`Ảnh ${selCell + 1}`} onClose={() => setSelected(null)}>
               <div className="seg tabs">
                 {(
                   [
@@ -572,19 +574,19 @@ export default function CollagePage() {
                   </label>
                   <div className="row wrap">
                     <button className="btn ghost sm" onClick={() => updatePhoto(selCell, { dx: 0, dy: 0, zoom: 1 })}>
-                      ⛶ Vừa ô
+                      <Icon name="maximize" /> Vừa ô
                     </button>
                     <button
                       className="btn ghost sm"
                       onClick={() => updatePhoto(selCell, { rotation: normalizeAngle(Math.round(selPhoto.rotation / 90) * 90 + 90), dx: 0, dy: 0, zoom: 1 })}
                     >
-                      ⟳ Xoay 90°
+                      <Icon name="rotate" /> Xoay 90°
                     </button>
                     <button className="btn ghost sm" onClick={() => setSwapFrom(selCell)}>
-                      ⇄ Đổi chỗ
+                      <Icon name="swap" /> Đổi chỗ
                     </button>
                     <button className="btn ghost sm" onClick={() => pickForCell(selCell)}>
-                      🔁 Đổi ảnh
+                      <Icon name="replace" /> Đổi ảnh
                     </button>
                     <button
                       className="btn danger sm"
@@ -593,7 +595,7 @@ export default function CollagePage() {
                         setSelected(null);
                       }}
                     >
-                      🗑 Bỏ ảnh
+                      <Icon name="trash" /> Bỏ ảnh
                     </button>
                   </div>
                   <p className="hint">Kéo ảnh để chỉnh vị trí trong ô.</p>
@@ -601,7 +603,7 @@ export default function CollagePage() {
               )}
             </SettingsPanel>
           ) : selText ? (
-            <SettingsPanel title={'🔤 ' + (selText.text || 'Chữ')} onClose={() => setSelected(null)}>
+            <SettingsPanel title={selText.text || 'Chữ'} onClose={() => setSelected(null)}>
               <TextPropsPanel
                 el={selText}
                 canvasWidth={W}
@@ -621,7 +623,7 @@ export default function CollagePage() {
         <div className="side-col">
           {filled === 0 && (
             <button className="btn primary lg block" onClick={() => multiInput.current?.click()}>
-              🖼️ Chọn {layout.cells.length} ảnh
+              <Icon name="image" /> Chọn {layout.cells.length} ảnh
             </button>
           )}
           {loading > 0 && <p className="hint">Đang đọc {loading} ảnh…</p>}
@@ -658,7 +660,7 @@ export default function CollagePage() {
                 <input type="color" value={doc.background} onChange={(e) => setDoc((d) => ({ ...d, background: e.target.value }), 'bg')} />
               </label>
               <button className="btn" onClick={addText}>
-                ＋ Thêm chữ
+                <Icon name="plus" /> Thêm chữ
               </button>
             </div>
             <label className="field inline">
@@ -670,7 +672,7 @@ export default function CollagePage() {
             </label>
           </div>
           <button className="btn primary lg block" disabled={filled === 0 || busy} onClick={exportImage}>
-            {busy ? 'Đang xuất…' : '⬇️ Xuất ảnh'}
+            {busy ? 'Đang xuất…' : <><Icon name="download" /> Xuất ảnh</>}
           </button>
           {filled > 0 && filled < layout.cells.length && (
             <p className="hint center-text">Còn {layout.cells.length - filled} ô trống – ô trống sẽ hiện màu nền.</p>
@@ -710,8 +712,8 @@ export default function CollagePage() {
               : result.saved === 'saving'
                 ? 'Đang lưu vào lịch sử…'
                 : result.saved === 'saved'
-                  ? '✓ Đã lưu vào lịch sử'
-                  : '⚠ Không lưu được lịch sử'
+                  ? 'Đã lưu vào lịch sử.'
+                  : 'Không lưu được lịch sử.'
           }
           onClose={() => setResult(null)}
         />

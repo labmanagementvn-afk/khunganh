@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Icon } from './Icon';
 
 /** Khung cài đặt của phần tử đang chọn, hiển thị ngay dưới ảnh */
 export function SettingsPanel({ title, onClose, children }: { title: ReactNode; onClose: () => void; children: ReactNode }) {
@@ -7,7 +8,7 @@ export function SettingsPanel({ title, onClose, children }: { title: ReactNode; 
       <div className="settings-head">
         <h3>{title}</h3>
         <button className="icon-btn" onClick={onClose} aria-label="Đóng phần chỉnh sửa" title="Bỏ chọn">
-          ✕
+          <Icon name="x" size={20} />
         </button>
       </div>
       {children}

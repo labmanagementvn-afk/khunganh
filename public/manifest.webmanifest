@@ -3,7 +3,7 @@
   "short_name": "Khung Ảnh",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#f5f6fb",
-  "theme_color": "#4f46e5",
+  "background_color": "#f5f4f0",
+  "theme_color": "#f5f4f0",
   "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
 }
