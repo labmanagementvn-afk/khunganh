@@ -5,7 +5,9 @@ import { Link, useParams } from 'react-router-dom';
 import { ResultModal } from '../components/ResultModal';
 import { TextNode, createTextElement } from '../components/TextNode';
 import { TextPropsPanel } from '../components/TextPropsPanel';
+import { UndoRedoButtons } from '../components/UndoRedoButtons';
 import { useArrowNudge } from '../components/useArrowNudge';
+import { useHistory, useUndoRedoKeys } from '../components/useHistory';
 import { useFitScale } from '../components/useFitScale';
 import { backend } from '../lib/backend';
 import { useUser } from '../lib/auth';
@@ -35,6 +37,15 @@ function fitScale(img: HTMLImageElement, rotation: number, w: number, h: number,
   return mode === 'cover' ? Math.max(w / iw, h / ih) : Math.min(w / iw, h / ih);
 }
 
+/** Toàn bộ trạng thái có thể Hoàn tác / Làm lại khi tạo ảnh */
+interface ComposeDoc {
+  photo: PhotoState | null;
+  values: Record<string, string>;
+  /** Bản sao các text của khung – chỉnh sửa ở đây chỉ áp dụng cho ảnh đang tạo (trừ khi lưu vào khung) */
+  texts: TextElement[];
+  extras: TextElement[];
+}
+
 const labelOf = (t: TextElement) => (t.label || 'Text nhập').trim();
 
 export default function ComposePage() {
@@ -43,11 +54,20 @@ export default function ComposePage() {
 
   const [tpl, setTpl] = useState<Template | null>(null);
   const [frameImg, setFrameImg] = useState<HTMLImageElement | null>(null);
-  const [photo, setPhoto] = useState<PhotoState | null>(null);
-  const [values, setValues] = useState<Record<string, string>>({});
-  /** Bản sao các text của khung – chỉnh sửa ở đây chỉ áp dụng cho ảnh đang tạo (trừ khi lưu vào khung) */
-  const [texts, setTexts] = useState<TextElement[]>([]);
-  const [extras, setExtras] = useState<TextElement[]>([]);
+  const history = useHistory<ComposeDoc>({ photo: null, values: {}, texts: [], extras: [] });
+  const { photo, values, texts, extras } = history.present;
+  /** Cập nhật một phần của ComposeDoc; mergeKey gộp các thay đổi liên tục (thu phóng, gõ chữ…) thành 1 bước hoàn tác */
+  const field =
+    <K extends keyof ComposeDoc>(key: K) =>
+    (u: ComposeDoc[K] | ((prev: ComposeDoc[K]) => ComposeDoc[K]), mergeKey?: string) =>
+      history.set((d) => {
+        const next = typeof u === 'function' ? (u as (prev: ComposeDoc[K]) => ComposeDoc[K])(d[key]) : u;
+        return next === d[key] ? d : { ...d, [key]: next };
+      }, mergeKey);
+  const setPhoto = field('photo');
+  const setValues = field('values');
+  const setTexts = field('texts');
+  const setExtras = field('extras');
   const [savingStyle, setSavingStyle] = useState<'' | 'saving' | 'saved'>('');
   const [selected, setSelected] = useState<string | null>(null);
   const [format, setFormat] = useState<'image/jpeg' | 'image/png'>('image/jpeg');
@@ -72,10 +92,9 @@ export default function ComposePage() {
         if (!t) throw new Error('Không tìm thấy khung mẫu');
         if (!alive) return;
         setTpl(t);
-        setTexts(t.texts);
         const init: Record<string, string> = {};
         t.texts.filter((x) => x.kind === 'input').forEach((x) => (init[labelOf(x)] ??= ''));
-        setValues(init);
+        history.reset({ photo: null, values: init, texts: t.texts, extras: [] });
         if (t.frame) {
           const img = await blobToImage(await backend.getBlob(user.uid, t.frame.blobId));
           if (alive) setFrameImg(img);
@@ -99,16 +118,18 @@ export default function ComposePage() {
     tr.getLayer()?.batchDraw();
   }, [selected, texts, extras, values, fontsVersion]);
 
+  useUndoRedoKeys(history.undo, history.redo);
+
   useArrowNudge(
     selected
       ? (dx, dy) => {
+          const key = 'nudge:' + selected;
           if (selected === 'photo') {
-            setPhoto((p) => (p ? { ...p, cx: p.cx + dx, cy: p.cy + dy } : p));
+            setPhoto((p) => (p ? { ...p, cx: p.cx + dx, cy: p.cy + dy } : p), key);
             return;
           }
           const move = (xs: TextElement[]) => xs.map((x) => (x.id === selected ? { ...x, x: x.x + dx, y: x.y + dy } : x));
-          setTexts(move);
-          setExtras(move);
+          history.set((d) => ({ ...d, texts: move(d.texts), extras: move(d.extras) }), key);
         }
       : null,
   );
@@ -151,7 +172,7 @@ export default function ComposePage() {
       const s = Math.min(maxZoom, Math.max(minZoom, next));
       const k = s / p.scale;
       return { ...p, scale: s, cx: aroundX + (p.cx - aroundX) * k, cy: aroundY + (p.cy - aroundY) * k };
-    });
+    }, 'zoom');
   }
 
   function fit(mode: 'cover' | 'contain') {
@@ -208,7 +229,7 @@ export default function ComposePage() {
         cx: cx + (p.cx - last.cx) * k,
         cy: cy + (p.cy - last.cy) * k,
       };
-    });
+    }, 'zoom');
   }
 
   function addExtraText() {
@@ -219,8 +240,9 @@ export default function ComposePage() {
     setSelected(el.id);
   }
 
-  const updateText = (tid: string, patch: Partial<TextElement>) =>
-    setTexts((xs) => xs.map((x) => (x.id === tid ? { ...x, ...patch } : x)));
+  // Kéo/thả là 1 bước hoàn tác riêng; chỉnh trong bảng thuộc tính truyền mergeKey để gộp
+  const updateText = (tid: string, patch: Partial<TextElement>, mergeKey?: string) =>
+    setTexts((xs) => xs.map((x) => (x.id === tid ? { ...x, ...patch } : x)), mergeKey);
 
   const displayValue = (t: TextElement) => (t.kind === 'input' ? values[labelOf(t)] ?? '' : t.text);
 
@@ -272,8 +294,11 @@ export default function ComposePage() {
 
   function nextImage() {
     setResult(null);
-    setPhoto(null);
-    setValues((v) => Object.fromEntries(Object.keys(v).map((k) => [k, ''])));
+    history.set((d) => ({
+      ...d,
+      photo: null,
+      values: Object.fromEntries(Object.keys(d.values).map((k) => [k, ''])),
+    }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -343,6 +368,12 @@ export default function ComposePage() {
     <div className="page editor">
       <div className="toolbar">
         <h1 className="grow ellipsis">{tpl.name}</h1>
+        <UndoRedoButtons
+          canUndo={history.canUndo}
+          canRedo={history.canRedo}
+          onUndo={history.undo}
+          onRedo={history.redo}
+        />
         <Link className="btn ghost sm" to={`/templates/${tpl.id}/edit`}>
           ✎ Sửa khung
         </Link>
@@ -468,7 +499,7 @@ export default function ComposePage() {
                   <input
                     value={values[label] ?? ''}
                     placeholder={texts.find((t) => t.kind === 'input' && labelOf(t) === label)?.text || label}
-                    onChange={(e) => setValues((v) => ({ ...v, [label]: e.target.value }))}
+                    onChange={(e) => setValues((v) => ({ ...v, [label]: e.target.value }), 'value:' + label)}
                     autoCapitalize="characters"
                   />
                 </label>
@@ -488,11 +519,11 @@ export default function ComposePage() {
                     ? {
                         label: labelOf(selText),
                         value: values[labelOf(selText)] ?? '',
-                        onChange: (v) => setValues((vs) => ({ ...vs, [labelOf(selText)]: v })),
+                        onChange: (v) => setValues((vs) => ({ ...vs, [labelOf(selText)]: v }), 'value:' + labelOf(selText)),
                       }
                     : undefined
                 }
-                onChange={(p) => updateText(selText.id, p)}
+                onChange={(p) => updateText(selText.id, p, 'text:' + selText.id)}
                 onReset={
                   original(selText.id) &&
                   JSON.stringify(original(selText.id)) !== JSON.stringify(selText)
@@ -544,7 +575,9 @@ export default function ComposePage() {
                 el={selExtra}
                 canvasWidth={tpl.width}
                 allowKind={false}
-                onChange={(p) => setExtras((xs) => xs.map((x) => (x.id === selExtra.id ? { ...x, ...p } : x)))}
+                onChange={(p) =>
+                  setExtras((xs) => xs.map((x) => (x.id === selExtra.id ? { ...x, ...p } : x)), 'text:' + selExtra.id)
+                }
                 onDelete={() => {
                   setExtras((xs) => xs.filter((x) => x.id !== selExtra.id));
                   setSelected(null);

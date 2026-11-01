@@ -4,7 +4,9 @@ import { Group, Image as KImage, Layer, Rect, Stage, Text, Transformer } from 'r
 import { useNavigate, useParams } from 'react-router-dom';
 import { TextNode, createTextElement } from '../components/TextNode';
 import { TextPropsPanel } from '../components/TextPropsPanel';
+import { UndoRedoButtons } from '../components/UndoRedoButtons';
 import { useArrowNudge } from '../components/useArrowNudge';
+import { useHistory, useUndoRedoKeys } from '../components/useHistory';
 import { useFitScale } from '../components/useFitScale';
 import { backend } from '../lib/backend';
 import { useUser } from '../lib/auth';
@@ -55,16 +57,32 @@ function containRect(w: number, h: number, cw: number, ch: number): R {
 
 type Sel = 'frame' | 'slot' | string | null;
 
+/** Toàn bộ trạng thái có thể Hoàn tác / Làm lại của trình sửa khung */
+interface EditorDoc {
+  tpl: Template;
+  frameImg: HTMLImageElement | null;
+  /** Ảnh khung mới chọn, chưa tải lên */
+  newFrameBlob: Blob | null;
+  frameRemoved: boolean;
+}
+
+const newDoc = (tpl: Template): EditorDoc => ({ tpl, frameImg: null, newFrameBlob: null, frameRemoved: false });
+
 export default function TemplateEditorPage() {
   const { id } = useParams();
   const user = useUser();
   const navigate = useNavigate();
   const isNew = !id;
 
-  const [tpl, setTpl] = useState<Template | null>(isNew ? emptyTemplate() : null);
-  const [frameImg, setFrameImg] = useState<HTMLImageElement | null>(null);
-  const [newFrameBlob, setNewFrameBlob] = useState<Blob | null>(null);
-  const [frameRemoved, setFrameRemoved] = useState(false);
+  const history = useHistory<EditorDoc | null>(isNew ? newDoc(emptyTemplate()) : null);
+  const doc = history.present;
+  const tpl = doc?.tpl ?? null;
+  const frameImg = doc?.frameImg ?? null;
+  const newFrameBlob = doc?.newFrameBlob ?? null;
+  const frameRemoved = doc?.frameRemoved ?? false;
+  /** mergeKey: các thay đổi liên tục cùng loại (kéo thanh trượt, gõ chữ…) gộp thành 1 bước hoàn tác */
+  const setTpl = (fn: (t: Template) => Template, mergeKey?: string) =>
+    history.set((d) => (d ? { ...d, tpl: fn(d.tpl) } : d), mergeKey);
   const [sampleImg, setSampleImg] = useState<HTMLImageElement | null>(null);
   const [selected, setSelected] = useState<Sel>(null);
   const [saving, setSaving] = useState(false);
@@ -89,10 +107,10 @@ export default function TemplateEditorPage() {
         const t = await backend.getTemplate(user.uid, id!);
         if (!t) throw new Error('Không tìm thấy khung mẫu');
         if (!alive) return;
-        setTpl(t);
+        history.reset(newDoc(t));
         if (t.frame) {
           const img = await blobToImage(await backend.getBlob(user.uid, t.frame.blobId));
-          if (alive) setFrameImg(img);
+          if (alive) history.reset((d) => (d ? { ...d, frameImg: img } : d));
         }
       } catch (e) {
         setError((e as Error).message);
@@ -113,53 +131,55 @@ export default function TemplateEditorPage() {
     tr.getLayer()?.batchDraw();
   }, [selected, tpl, frameImg, fontsVersion]);
 
+  useUndoRedoKeys(history.undo, history.redo);
+
   useArrowNudge(
     selected
       ? (dx, dy) =>
           setTpl((t) => {
-            if (!t) return t;
             if (selected === 'frame')
               return t.frame ? { ...t, frame: { ...t.frame, x: t.frame.x + dx, y: t.frame.y + dy } } : t;
             if (selected === 'slot')
               return { ...t, photoSlot: { ...t.photoSlot, x: t.photoSlot.x + dx, y: t.photoSlot.y + dy } };
             return { ...t, texts: t.texts.map((x) => (x.id === selected ? { ...x, x: x.x + dx, y: x.y + dy } : x)) };
-          })
+          }, 'nudge:' + selected)
       : null,
   );
 
   if (error && !tpl) return <div className="page"><p className="error">{error}</p></div>;
   if (!tpl) return <div className="page center"><div className="spinner" /></div>;
 
-  const update = (patch: Partial<Template>) => setTpl((t) => (t ? { ...t, ...patch } : t));
-  const updateText = (tid: string, patch: Partial<TextElement>) =>
-    setTpl((t) => (t ? { ...t, texts: t.texts.map((x) => (x.id === tid ? { ...x, ...patch } : x)) } : t));
-  const updateSlot = (patch: Partial<PhotoSlot>) => setTpl((t) => (t ? { ...t, photoSlot: { ...t.photoSlot, ...patch } } : t));
-  const updateFrame = (patch: Partial<R>) =>
-    setTpl((t) => (t && t.frame ? { ...t, frame: { ...t.frame, ...patch } } : t));
+  const update = (patch: Partial<Template>, mergeKey?: string) => setTpl((t) => ({ ...t, ...patch }), mergeKey);
+  // Kéo/thả là 1 bước hoàn tác riêng; chỉnh trong bảng thuộc tính truyền mergeKey để gộp
+  const updateText = (tid: string, patch: Partial<TextElement>, mergeKey?: string) =>
+    setTpl((t) => ({ ...t, texts: t.texts.map((x) => (x.id === tid ? { ...x, ...patch } : x)) }), mergeKey);
+  const updateSlot = (patch: Partial<PhotoSlot>, mergeKey?: string) =>
+    setTpl((t) => ({ ...t, photoSlot: { ...t.photoSlot, ...patch } }), mergeKey);
+  const updateFrame = (patch: Partial<R>, mergeKey?: string) =>
+    setTpl((t) => (t.frame ? { ...t, frame: { ...t.frame, ...patch } } : t), mergeKey);
 
   async function onPickFrame(file: File | undefined) {
     if (!file) return;
     try {
       const { blob, img } = await prepareImageFile(file, MAX_FRAME_SIDE, true);
-      setFrameImg(img);
-      setNewFrameBlob(blob);
-      setFrameRemoved(false);
-      setTpl((t) => {
-        if (!t) return t;
-        const w = img.naturalWidth;
-        const h = img.naturalHeight;
-        if (!started) {
-          // Lần đầu: kích thước ảnh xuất = kích thước khung
-          return {
-            ...t,
-            width: w,
-            height: h,
-            frame: { blobId: '', x: 0, y: 0, width: w, height: h },
-            photoSlot: defaultSlot(w, h),
-          };
-        }
-        return { ...t, frame: { blobId: t.frame?.blobId ?? '', ...containRect(w, h, t.width, t.height) } };
-      });
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      const apply = (d: EditorDoc | null): EditorDoc | null => {
+        if (!d) return d;
+        const t = d.tpl;
+        return {
+          frameImg: img,
+          newFrameBlob: blob,
+          frameRemoved: false,
+          tpl: !started
+            ? // Lần đầu: kích thước ảnh xuất = kích thước khung
+              { ...t, width: w, height: h, frame: { blobId: '', x: 0, y: 0, width: w, height: h }, photoSlot: defaultSlot(w, h) }
+            : { ...t, frame: { blobId: t.frame?.blobId ?? '', ...containRect(w, h, t.width, t.height) } },
+        };
+      };
+      // Chọn khung lần đầu là điểm bắt đầu, không cần hoàn tác về màn hình trống
+      if (started) history.set(apply);
+      else history.reset(apply);
       setStarted(true);
       setSelected('slot');
     } catch (e) {
@@ -175,7 +195,6 @@ export default function TemplateEditorPage() {
 
   function changeCanvasSize(w: number, h: number) {
     setTpl((t) => {
-      if (!t) return t;
       const sx = w / t.width;
       const sy = h / t.height;
       return {
@@ -365,7 +384,13 @@ export default function TemplateEditorPage() {
           className="name-input"
           placeholder="Tên khung mẫu (vd: Khung Shopee)"
           value={tpl.name}
-          onChange={(e) => update({ name: e.target.value })}
+          onChange={(e) => update({ name: e.target.value }, 'name')}
+        />
+        <UndoRedoButtons
+          canUndo={history.canUndo}
+          canRedo={history.canRedo}
+          onUndo={history.undo}
+          onRedo={history.redo}
         />
         <button className="btn primary" disabled={saving} onClick={save}>
           {saving ? 'Đang lưu…' : '💾 Lưu khung'}
@@ -459,7 +484,7 @@ export default function TemplateEditorPage() {
                 el={selText}
                 canvasWidth={tpl.width}
                 allowKind
-                onChange={(p) => updateText(selText.id, p)}
+                onChange={(p) => updateText(selText.id, p, 'text:' + selText.id)}
                 onDuplicate={() => {
                   const copy = { ...selText, id: newId(), y: selText.y + selText.fontSize * 1.3 };
                   update({ texts: [...tpl.texts, copy] });
@@ -476,7 +501,7 @@ export default function TemplateEditorPage() {
               <h3>Vùng đặt ảnh sản phẩm</h3>
               <div className="panel">
                 <p className="hint">Kéo và kéo góc để chỉnh vị trí, kích thước vùng ảnh sẽ được chèn vào.</p>
-                <NumberRow rect={slot} onChange={updateSlot} />
+                <NumberRow rect={slot} onChange={(p) => updateSlot(p, 'slot-num')} />
                 <label className="field">
                   <span>Bo góc: {slot.radius}px</span>
                   <input
@@ -484,7 +509,7 @@ export default function TemplateEditorPage() {
                     min={0}
                     max={Math.round(Math.min(slot.width, slot.height) / 2)}
                     value={slot.radius}
-                    onChange={(e) => updateSlot({ radius: Number(e.target.value) })}
+                    onChange={(e) => updateSlot({ radius: Number(e.target.value) }, 'slot-radius')}
                   />
                 </label>
                 <div className="row wrap">
@@ -509,7 +534,7 @@ export default function TemplateEditorPage() {
             <>
               <h3>Ảnh khung</h3>
               <div className="panel">
-                <NumberRow rect={tpl.frame!} onChange={updateFrame} />
+                <NumberRow rect={tpl.frame!} onChange={(p) => updateFrame(p, 'frame-num')} />
                 <div className="row wrap">
                   <button
                     className="btn ghost sm"
@@ -526,7 +551,7 @@ export default function TemplateEditorPage() {
                   <button
                     className="btn danger sm"
                     onClick={() => {
-                      setFrameRemoved(true);
+                      history.set((d) => (d ? { ...d, frameRemoved: true } : d));
                       setSelected(null);
                     }}
                   >
@@ -568,7 +593,7 @@ export default function TemplateEditorPage() {
                 <div className="row">
                   <label className="field color">
                     <span>Màu nền</span>
-                    <input type="color" value={tpl.background} onChange={(e) => update({ background: e.target.value })} />
+                    <input type="color" value={tpl.background} onChange={(e) => update({ background: e.target.value }, 'bg')} />
                   </label>
                   <label className="check grow">
                     <input type="checkbox" checked={tpl.photoOnTop} onChange={(e) => update({ photoOnTop: e.target.checked })} />
