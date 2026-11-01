@@ -14,25 +14,33 @@ interface Props {
   onChange?: (patch: Partial<TextElement>) => void;
 }
 
+/** Thuộc tính Konva.Text cho một dòng chữ – dùng chung cho trình sửa và ảnh xem trước của mẫu */
+export function textConfig(el: TextElement, value: string): Konva.TextConfig {
+  return {
+    id: el.id,
+    x: el.x,
+    y: el.y,
+    width: el.width,
+    rotation: el.rotation,
+    text: el.uppercase ? value.toUpperCase() : value,
+    fontFamily: `"${el.fontFamily}"`,
+    fontSize: el.fontSize,
+    fontStyle: el.fontStyle,
+    fill: el.fill,
+    align: el.align,
+    letterSpacing: el.letterSpacing ?? 0,
+    stroke: el.strokeWidth > 0 ? el.stroke : undefined,
+    strokeWidth: el.strokeWidth,
+    fillAfterStrokeEnabled: true,
+    lineJoin: 'round',
+  };
+}
+
 export function TextNode({ el, value, interactive, opacity = 1, name = 'text', onSelect, onChange }: Props) {
   return (
     <Text
-      id={el.id}
+      {...textConfig(el, value)}
       name={name}
-      x={el.x}
-      y={el.y}
-      width={el.width}
-      rotation={el.rotation}
-      text={el.uppercase ? value.toUpperCase() : value}
-      fontFamily={`"${el.fontFamily}"`}
-      fontSize={el.fontSize}
-      fontStyle={el.fontStyle}
-      fill={el.fill}
-      align={el.align}
-      stroke={el.strokeWidth > 0 ? el.stroke : undefined}
-      strokeWidth={el.strokeWidth}
-      fillAfterStrokeEnabled
-      lineJoin="round"
       opacity={opacity}
       listening={interactive}
       draggable={interactive}

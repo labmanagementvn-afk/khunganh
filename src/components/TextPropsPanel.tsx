@@ -86,6 +86,17 @@ export function TextPropsPanel({ el, canvasWidth, allowKind, onChange, onDelete,
         />
       </label>
 
+      <label className="field">
+        <span>Giãn chữ: {el.letterSpacing ?? 0}px</span>
+        <input
+          type="range"
+          min={0}
+          max={Math.max(10, Math.round(el.fontSize / 2))}
+          value={el.letterSpacing ?? 0}
+          onChange={(e) => onChange({ letterSpacing: Number(e.target.value) })}
+        />
+      </label>
+
       <div className="row wrap">
         <div className="seg small">
           <button className={bold ? 'on' : ''} onClick={() => setStyle(!bold, italic)} title="Đậm">
