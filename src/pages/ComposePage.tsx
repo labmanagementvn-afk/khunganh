@@ -1,4 +1,6 @@
 import Konva from 'konva';
+import { CANVAS_UI } from '../lib/theme';
+import { Icon } from '../components/Icon';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Group, Image as KImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
@@ -344,16 +346,16 @@ export default function ComposePage() {
         />
       ) : (
         <Group id="slot-hint" onClick={() => fileInput.current?.click()} onTap={() => fileInput.current?.click()}>
-          <Rect {...slot} cornerRadius={slot.radius} fill="#eef0ff" />
+          <Rect {...slot} cornerRadius={slot.radius} fill={CANVAS_UI.placeholder} />
           <Text
             x={slot.x}
             y={slot.y + slot.height / 2 - 16 / scale}
             width={slot.width}
             align="center"
-            text={'📷 Chạm để chọn ảnh'}
+            text={'Chạm để chọn ảnh'}
             fontSize={24 / scale}
             fontStyle="bold"
-            fill="#4f46e5"
+            fill={CANVAS_UI.placeholderText}
           />
         </Group>
       )}
@@ -384,21 +386,21 @@ export default function ComposePage() {
       <div className="toolbar">
         <h1 className="grow ellipsis">{tpl.name}</h1>
         <Link className="btn ghost sm" to={`/batch/${tpl.id}`} title="Chọn nhiều ảnh, tạo nhiều kết quả cùng lúc">
-          📚 Hàng loạt
+          <Icon name="layers" /> Hàng loạt
         </Link>
         <Link className="btn ghost sm" to={`/templates/${tpl.id}/edit`}>
-          ✎ Sửa khung
+          <Icon name="edit" /> Sửa khung
         </Link>
       </div>
       {fromPreset && (
         <div className="banner">
-          <span>✓ Đã thêm “{tpl.name}” vào Khung mẫu của bạn. Bạn có thể sửa chữ, màu, vị trí bất kỳ lúc nào.</span>
+          <span><Icon name="check" /> Đã thêm “{tpl.name}” vào Khung mẫu của bạn. Bạn có thể sửa chữ, màu, vị trí bất kỳ lúc nào.</span>
           <span className="row">
             <Link className="btn sm" to={`/templates/${tpl.id}/edit`}>
-              ✎ Sửa khung
+              <Icon name="edit" /> Sửa khung
             </Link>
             <button className="icon-btn" aria-label="Đóng" onClick={() => setParams({}, { replace: true })}>
-              ✕
+              <Icon name="x" />
             </button>
           </span>
         </div>
@@ -460,8 +462,8 @@ export default function ComposePage() {
                   enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right']}
                   anchorSize={14}
                   anchorCornerRadius={4}
-                  borderStroke="#4f46e5"
-                  anchorStroke="#4f46e5"
+                  borderStroke={CANVAS_UI.accent}
+                  anchorStroke={CANVAS_UI.accent}
                 />
               </Layer>
             </Stage>
@@ -476,17 +478,17 @@ export default function ComposePage() {
           <div className="chips">
             {photo && (
               <button className={selected === 'photo' ? 'chip on' : 'chip'} onClick={() => setSelected('photo')}>
-                📷 Ảnh
+                <Icon name="camera" /> Ảnh
               </button>
             )}
             {[...texts, ...extras].map((t) => (
               <button key={t.id} className={selected === t.id ? 'chip on' : 'chip'} onClick={() => setSelected(t.id)}>
-                {t.kind === 'input' ? '✏️ ' + labelOf(t) : '🔤 ' + (t.text.slice(0, 14) || 'Text')}
+                <Icon name={t.kind === 'input' ? 'edit' : 'type'} size={15} /> {t.kind === 'input' ? labelOf(t) : t.text.slice(0, 14) || 'Text'}
               </button>
             ))}
           </div>
           {selected === 'photo' && photo ? (
-            <SettingsPanel title="📷 Ảnh sản phẩm" onClose={() => setSelected(null)}>
+            <SettingsPanel title="Ảnh sản phẩm" onClose={() => setSelected(null)}>
               <div className="seg tabs">
                 {(
                   [
@@ -541,10 +543,10 @@ export default function ComposePage() {
                     </div>
                   </label>
                   <div className="row wrap">
-                    <button className="btn ghost sm" onClick={() => fit('cover')}>⛶ Lấp đầy</button>
-                    <button className="btn ghost sm" onClick={() => fit('contain')}>▣ Hiện toàn bộ</button>
-                    <button className="btn ghost sm" onClick={rotate}>⟳ Xoay 90°</button>
-                    <button className="btn ghost sm" onClick={() => fileInput.current?.click()}>🔁 Đổi ảnh</button>
+                    <button className="btn ghost sm" onClick={() => fit('cover')}><Icon name="maximize" /> Lấp đầy</button>
+                    <button className="btn ghost sm" onClick={() => fit('contain')}><Icon name="minimize" /> Hiện toàn bộ</button>
+                    <button className="btn ghost sm" onClick={rotate}><Icon name="rotate" /> Xoay 90°</button>
+                    <button className="btn ghost sm" onClick={() => fileInput.current?.click()}><Icon name="replace" /> Đổi ảnh</button>
                   </div>
                   <p className="hint">Kéo ảnh để di chuyển. Dùng 2 ngón tay để vừa phóng to/thu nhỏ vừa xoay ảnh.</p>
                 </>
@@ -552,7 +554,7 @@ export default function ComposePage() {
             </SettingsPanel>
           ) : selText ? (
             <SettingsPanel
-              title={selText.kind === 'input' ? '✏️ ' + labelOf(selText) : '🔤 ' + (selText.text || 'Chữ của khung')}
+              title={selText.kind === 'input' ? labelOf(selText) : selText.text || 'Chữ của khung'}
               onClose={() => setSelected(null)}
             >
               <TextPropsPanel
@@ -582,7 +584,7 @@ export default function ComposePage() {
               />
             </SettingsPanel>
           ) : selExtra ? (
-            <SettingsPanel title={'🔤 ' + (selExtra.text || 'Chữ thêm')} onClose={() => setSelected(null)}>
+            <SettingsPanel title={selExtra.text || 'Chữ thêm'} onClose={() => setSelected(null)}>
               <TextPropsPanel
                 el={selExtra}
                 canvasWidth={tpl.width}
@@ -607,7 +609,7 @@ export default function ComposePage() {
         <div className="side-col">
           {!photo && (
             <button className="btn primary lg block" onClick={() => fileInput.current?.click()}>
-              📷 Chọn ảnh sản phẩm
+              <Icon name="camera" /> Chọn ảnh sản phẩm
             </button>
           )}
 
@@ -633,7 +635,7 @@ export default function ComposePage() {
               <p className="hint">Bạn đã chỉnh chữ của khung cho ảnh này. Lưu lại để lần sau dùng luôn kiểu này?</p>
               <div className="row wrap">
                 <button className="btn sm" disabled={savingStyle === 'saving'} onClick={saveStyleToTemplate}>
-                  {savingStyle === 'saving' ? 'Đang lưu…' : '💾 Lưu vào khung mẫu'}
+                  {savingStyle === 'saving' ? 'Đang lưu…' : <><Icon name="save" /> Lưu vào khung mẫu</>}
                 </button>
                 <button
                   className="btn ghost sm"
@@ -642,16 +644,16 @@ export default function ComposePage() {
                     setSelected(null);
                   }}
                 >
-                  ↺ Bỏ tất cả chỉnh sửa
+                  <Icon name="reset" /> Bỏ tất cả chỉnh sửa
                 </button>
               </div>
             </div>
           )}
-          {!textsChanged && savingStyle === 'saved' && <p className="hint">✓ Đã lưu kiểu chữ vào khung mẫu.</p>}
+          {!textsChanged && savingStyle === 'saved' && <p className="hint"><Icon name="check" /> Đã lưu kiểu chữ vào khung mẫu.</p>}
 
           <div className="panel">
             <div className="row wrap">
-              <button className="btn" onClick={addExtraText}>＋ Thêm chữ</button>
+              <button className="btn" onClick={addExtraText}><Icon name="plus" /> Thêm chữ</button>
               <label className="field inline">
                 <span>Định dạng</span>
                 <select value={format} onChange={(e) => setFormat(e.target.value as typeof format)}>
@@ -663,7 +665,7 @@ export default function ComposePage() {
           </div>
 
           <button className="btn primary lg block" disabled={!photo || busy} onClick={exportImage}>
-            {busy ? 'Đang xuất…' : '⬇️ Xuất ảnh'}
+            {busy ? 'Đang xuất…' : <><Icon name="download" /> Xuất ảnh</>}
           </button>
           {!photo && <p className="hint center-text">Chọn ảnh sản phẩm để xuất ảnh.</p>}
         </div>
@@ -690,13 +692,13 @@ export default function ComposePage() {
               : result.saved === 'saving'
                 ? 'Đang lưu vào lịch sử…'
                 : result.saved === 'saved'
-                  ? '✓ Đã lưu vào lịch sử'
-                  : '⚠ Không lưu được lịch sử'
+                  ? 'Đã lưu vào lịch sử.'
+                  : 'Không lưu được lịch sử.'
           }
           onClose={() => setResult(null)}
           extraAction={
             <button className="btn" onClick={nextImage}>
-              ➕ Tạo ảnh tiếp
+              <Icon name="plus" /> Tạo ảnh tiếp
             </button>
           }
         />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Icon } from '../components/Icon';
 import { Link, useNavigate } from 'react-router-dom';
 import { PresetGallery } from '../components/PresetGallery';
 import { useSession } from '../lib/auth';
@@ -30,7 +31,7 @@ export default function HomePage() {
       <div className="toolbar">
         <h1 className="grow">Khung mẫu của tôi</h1>
         <Link to="/templates/new" className="btn primary">
-          ＋ Tạo khung mới
+          <Icon name="plus" /> Tạo khung mới
         </Link>
       </div>
       {guest && (
@@ -54,7 +55,7 @@ export default function HomePage() {
             nhập mã.
           </p>
           <Link to="/templates/new" className="btn lg">
-            ＋ Tự tạo khung
+            <Icon name="plus" /> Tự tạo khung
           </Link>
         </div>
       )}
@@ -62,7 +63,7 @@ export default function HomePage() {
         {items?.map((t) => (
           <div key={t.id} className="tpl-card">
             <button className="tpl-thumb" onClick={() => navigate(`/compose/${t.id}`)} title="Dùng khung này">
-              {t.thumbnail ? <img src={t.thumbnail} alt={t.name} /> : <span>🖼️</span>}
+              {t.thumbnail ? <img src={t.thumbnail} alt={t.name} /> : <span><Icon name="image" /> </span>}
             </button>
             <div className="tpl-info">
               <strong className="ellipsis">{t.name}</strong>
@@ -75,13 +76,13 @@ export default function HomePage() {
                 Dùng khung
               </Link>
               <Link className="btn ghost sm" to={`/batch/${t.id}`} title="Tạo hàng loạt từ nhiều ảnh">
-                📚
+                <Icon name="layers" /> 
               </Link>
               <Link className="btn ghost sm" to={`/templates/${t.id}/edit`} title="Sửa">
-                ✎
+                <Icon name="edit" /> 
               </Link>
               <button className="btn ghost sm" onClick={() => remove(t)} title="Xoá">
-                🗑
+                <Icon name="trash" /> 
               </button>
             </div>
           </div>
@@ -89,7 +90,7 @@ export default function HomePage() {
       </div>
       <section className="collage-entry">
         <div className="toolbar">
-          <h2 className="grow">🧩 Ghép nhiều ảnh</h2>
+          <h2 className="grow"><Icon name="grid" /> Ghép nhiều ảnh</h2>
         </div>
         <p className="hint">Chọn số ảnh muốn ghép – đổi bố cục, khoảng cách, bo góc thoải mái trong màn hình chỉnh sửa.</p>
         <div className="collage-counts">

@@ -1,4 +1,6 @@
 import type Konva from 'konva';
+import { CANVAS_UI } from '../lib/theme';
+import { Icon } from '../components/Icon';
 import { useEffect, useRef, useState } from 'react';
 import { Group, Image as KImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -271,7 +273,7 @@ export default function TemplateEditorPage() {
         <div className="card start">
           <p>Bước 1: Tải lên ảnh khung (nên dùng ảnh PNG có vùng trong suốt để đặt ảnh sản phẩm).</p>
           <button className="btn primary lg" onClick={() => frameInput.current?.click()}>
-            🖼️ Chọn ảnh khung từ máy
+            <Icon name="image" /> Chọn ảnh khung từ máy
           </button>
           <button className="btn ghost" onClick={() => setStarted(true)}>
             Bỏ qua – không dùng ảnh khung
@@ -341,8 +343,8 @@ export default function TemplateEditorPage() {
         width={slot.width}
         height={slot.height}
         cornerRadius={slot.radius}
-        fill={sampleImg ? 'rgba(79,70,229,0.06)' : 'rgba(79,70,229,0.18)'}
-        stroke="#4f46e5"
+        fill={sampleImg ? CANVAS_UI.slotFillLight : CANVAS_UI.slotFill}
+        stroke={CANVAS_UI.accent}
         strokeWidth={Math.max(2, 3 / scale)}
         dash={[12 / scale, 8 / scale]}
         draggable
@@ -368,10 +370,10 @@ export default function TemplateEditorPage() {
           y={slot.y + slot.height / 2 - 14 / scale}
           width={slot.width}
           align="center"
-          text="📷 Vùng ảnh sản phẩm"
+          text="Vùng ảnh sản phẩm"
           fontSize={22 / scale}
           fontStyle="bold"
-          fill="#4f46e5"
+          fill={CANVAS_UI.accent}
         />
       )}
     </Group>
@@ -387,7 +389,7 @@ export default function TemplateEditorPage() {
           onChange={(e) => update({ name: e.target.value }, 'name')}
         />
         <button className="btn primary" disabled={saving} onClick={save}>
-          {saving ? 'Đang lưu…' : '💾 Lưu khung'}
+          {saving ? 'Đang lưu…' : <><Icon name="save" /> Lưu khung</>}
         </button>
       </div>
       {error && <p className="error">{error}</p>}
@@ -437,8 +439,8 @@ export default function TemplateEditorPage() {
                   }
                   anchorSize={Math.max(14, 10)}
                   anchorCornerRadius={4}
-                  borderStroke="#4f46e5"
-                  anchorStroke="#4f46e5"
+                  borderStroke={CANVAS_UI.accent}
+                  anchorStroke={CANVAS_UI.accent}
                   boundBoxFunc={(oldBox, newBox) => (newBox.width < 10 || newBox.height < 10 ? oldBox : newBox)}
                 />
               </Layer>
@@ -454,21 +456,21 @@ export default function TemplateEditorPage() {
           <div className="chips">
             {hasFrame && (
               <button className={selected === 'frame' ? 'chip on' : 'chip'} onClick={() => setSelected('frame')}>
-                🖼️ Khung
+                <Icon name="image" /> Khung
               </button>
             )}
             <button className={selected === 'slot' ? 'chip on' : 'chip'} onClick={() => setSelected('slot')}>
-              📷 Vùng ảnh
+              <Icon name="camera" /> Vùng ảnh
             </button>
             {tpl.texts.map((t) => (
               <button key={t.id} className={selected === t.id ? 'chip on' : 'chip'} onClick={() => setSelected(t.id)}>
-                {t.kind === 'input' ? '✏️ ' + (t.label || 'Text nhập') : '🔤 ' + (t.text.slice(0, 14) || 'Text')}
+                <Icon name={t.kind === 'input' ? 'edit' : 'type'} size={15} /> {t.kind === 'input' ? t.label || 'Text nhập' : t.text.slice(0, 14) || 'Text'}
               </button>
             ))}
           </div>
           {selText ? (
             <SettingsPanel
-              title={selText.kind === 'input' ? '✏️ ' + (selText.label || 'Text nhập') : '🔤 ' + (selText.text || 'Text cố định')}
+              title={selText.kind === 'input' ? selText.label || 'Text nhập' : selText.text || 'Text cố định'}
               onClose={() => setSelected(null)}
             >
               <TextPropsPanel
@@ -488,7 +490,7 @@ export default function TemplateEditorPage() {
               />
             </SettingsPanel>
           ) : selected === 'slot' ? (
-            <SettingsPanel title="📷 Vùng đặt ảnh sản phẩm" onClose={() => setSelected(null)}>
+            <SettingsPanel title="Vùng đặt ảnh sản phẩm" onClose={() => setSelected(null)}>
               <p className="hint">Kéo và kéo góc để chỉnh vị trí, kích thước vùng ảnh sẽ được chèn vào.</p>
               <NumberRow rect={slot} onChange={(p) => updateSlot(p, 'slot-num')} />
               <label className="field">
@@ -503,13 +505,13 @@ export default function TemplateEditorPage() {
               </label>
               <div className="row wrap">
                 <button className="btn ghost sm" onClick={() => updateSlot({ x: 0, y: 0, width: tpl.width, height: tpl.height })}>
-                  ⛶ Toàn khung
+                  <Icon name="maximize" /> Toàn khung
                 </button>
                 <button className="btn ghost sm" onClick={() => updateSlot({ x: Math.round((tpl.width - slot.width) / 2) })}>
-                  ↔ Căn giữa ngang
+                  <Icon name="center" /> Căn giữa ngang
                 </button>
                 <button className="btn ghost sm" onClick={() => sampleInput.current?.click()}>
-                  🧪 {sampleImg ? 'Đổi ảnh thử' : 'Xem thử với 1 ảnh'}
+                  <Icon name="eye" /> {sampleImg ? 'Đổi ảnh thử' : 'Xem thử với 1 ảnh'}
                 </button>
                 {sampleImg && (
                   <button className="btn ghost sm" onClick={() => setSampleImg(null)}>
@@ -519,20 +521,20 @@ export default function TemplateEditorPage() {
               </div>
             </SettingsPanel>
           ) : selected === 'frame' && hasFrame ? (
-            <SettingsPanel title="🖼️ Ảnh khung" onClose={() => setSelected(null)}>
+            <SettingsPanel title="Ảnh khung" onClose={() => setSelected(null)}>
               <NumberRow rect={tpl.frame!} onChange={(p) => updateFrame(p, 'frame-num')} />
               <div className="row wrap">
                 <button
                   className="btn ghost sm"
                   onClick={() => updateFrame(containRect(frameImg!.naturalWidth, frameImg!.naturalHeight, tpl.width, tpl.height))}
                 >
-                  ⛶ Vừa canvas
+                  <Icon name="maximize" /> Vừa canvas
                 </button>
                 <button className="btn ghost sm" onClick={() => updateFrame({ x: 0, y: 0, width: tpl.width, height: tpl.height })}>
-                  ⤢ Kéo giãn toàn canvas
+                  <Icon name="maximize" /> Kéo giãn toàn canvas
                 </button>
                 <button className="btn ghost sm" onClick={() => frameInput.current?.click()}>
-                  🔁 Đổi ảnh khung
+                  <Icon name="replace" /> Đổi ảnh khung
                 </button>
                 <button
                   className="btn danger sm"
@@ -541,7 +543,7 @@ export default function TemplateEditorPage() {
                     setSelected(null);
                   }}
                 >
-                  🗑 Bỏ khung
+                  <Icon name="trash" /> Bỏ khung
                 </button>
               </div>
             </SettingsPanel>
@@ -553,10 +555,10 @@ export default function TemplateEditorPage() {
           )}
           <div className="row wrap">
             <button className="btn" onClick={() => addText('fixed')}>
-              ＋ Text cố định
+              <Icon name="plus" /> Text cố định
             </button>
             <button className="btn" onClick={() => addText('input')}>
-              ＋ Text nhập (input)
+              <Icon name="plus" /> Text nhập (input)
             </button>
           </div>
         </div>
@@ -601,7 +603,7 @@ export default function TemplateEditorPage() {
             </div>
             {!hasFrame && (
               <button className="btn" onClick={() => frameInput.current?.click()}>
-                🖼️ Thêm ảnh khung
+                <Icon name="image" /> Thêm ảnh khung
               </button>
             )}
           </div>

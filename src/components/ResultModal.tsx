@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Icon } from './Icon';
 import { canShareFiles, downloadBlob, shareBlob } from '../lib/share';
 
 interface Props {
@@ -27,7 +28,7 @@ export function ResultModal({ blob, filename, status, onClose, extraAction }: Pr
         <div className="modal-head">
           <h2>Ảnh đã tạo</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Đóng">
-            ✕
+            <Icon name="x" size={20} />
           </button>
         </div>
         {url && <img className="result-img" src={url} alt="Ảnh kết quả" />}
@@ -38,11 +39,11 @@ export function ResultModal({ blob, filename, status, onClose, extraAction }: Pr
               className="btn primary lg"
               onClick={() => shareBlob(blob, filename).catch((e) => setShareError((e as Error).message))}
             >
-              📲 Lưu vào Ảnh / Chia sẻ
+              <Icon name="share" /> Lưu vào Ảnh / Chia sẻ
             </button>
           )}
           <button className={shareable ? 'btn lg' : 'btn primary lg'} onClick={() => downloadBlob(blob, filename)}>
-            ⬇️ Tải về
+            <Icon name="download" /> Tải về
           </button>
           {extraAction}
         </div>
