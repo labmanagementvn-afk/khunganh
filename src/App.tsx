@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { HashRouter, Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import { backend } from './lib/backend';
 import { AuthProvider, useAuth } from './lib/auth';
+import BatchPage from './pages/BatchPage';
 import ComposePage from './pages/ComposePage';
 import HistoryPage from './pages/HistoryPage';
 import HomePage from './pages/HomePage';
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/templates/new" element={<Shell><TemplateEditorPage key="new" /></Shell>} />
           <Route path="/templates/:id/edit" element={<Shell><TemplateEditorPage /></Shell>} />
           <Route path="/compose/:id" element={<Shell><ComposePage /></Shell>} />
+          <Route path="/batch/:id" element={<Shell><BatchPage /></Shell>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </HashRouter>
