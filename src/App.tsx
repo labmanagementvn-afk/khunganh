@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { HashRouter, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { Icon } from './components/Icon';
 import { AuthProvider, useAuth } from './lib/auth';
@@ -14,6 +14,15 @@ import TemplateEditorPage from './pages/TemplateEditorPage';
 
 /** Trang cấp cao nhất – hiện thanh điều hướng dưới đáy trên điện thoại */
 const TOP_LEVEL = ['/', '/feed', '/collage', '/account'];
+
+/** Mở trang mới luôn bắt đầu từ đầu trang (trình duyệt không tự làm với điều hướng trong app) */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
 
 function Shell({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -71,6 +80,7 @@ export default function App() {
   return (
     <AuthProvider>
       <HashRouter>
+        <ScrollToTop />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<Shell><HomePage /></Shell>} />
