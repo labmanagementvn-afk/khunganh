@@ -4,6 +4,7 @@ import { Group, Image as KImage, Layer, Rect, Stage, Text, Transformer } from 'r
 import { useNavigate, useParams } from 'react-router-dom';
 import { TextNode, createTextElement } from '../components/TextNode';
 import { TextPropsPanel } from '../components/TextPropsPanel';
+import { useArrowNudge } from '../components/useArrowNudge';
 import { useFitScale } from '../components/useFitScale';
 import { backend } from '../lib/backend';
 import { useUser } from '../lib/auth';
@@ -111,6 +112,20 @@ export default function TemplateEditorPage() {
     tr.nodes(node ? [node] : []);
     tr.getLayer()?.batchDraw();
   }, [selected, tpl, frameImg, fontsVersion]);
+
+  useArrowNudge(
+    selected
+      ? (dx, dy) =>
+          setTpl((t) => {
+            if (!t) return t;
+            if (selected === 'frame')
+              return t.frame ? { ...t, frame: { ...t.frame, x: t.frame.x + dx, y: t.frame.y + dy } } : t;
+            if (selected === 'slot')
+              return { ...t, photoSlot: { ...t.photoSlot, x: t.photoSlot.x + dx, y: t.photoSlot.y + dy } };
+            return { ...t, texts: t.texts.map((x) => (x.id === selected ? { ...x, x: x.x + dx, y: x.y + dy } : x)) };
+          })
+      : null,
+  );
 
   if (error && !tpl) return <div className="page"><p className="error">{error}</p></div>;
   if (!tpl) return <div className="page center"><div className="spinner" /></div>;
@@ -524,7 +539,7 @@ export default function TemplateEditorPage() {
             <>
               <h3>Cài đặt khung</h3>
               <div className="panel">
-                <p className="hint">Chạm vào phần tử trên ảnh (hoặc các nút bên dưới ảnh) để chỉnh sửa.</p>
+                <p className="hint">Chạm vào phần tử trên ảnh (hoặc các nút bên dưới ảnh) để chỉnh sửa. Trên máy tính: dùng phím mũi tên để dịch chuyển phần tử đang chọn (giữ Shift: 10px).</p>
                 <label className="field">
                   <span>Kích thước ảnh xuất</span>
                   <select
