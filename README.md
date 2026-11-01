@@ -87,6 +87,13 @@ Cloud Storage / gói Blaze** và không gặp lỗi CORS khi vẽ lên canvas.
 (≤720px, ~100 KB) cùng thông tin đã nhập – không lưu file ảnh gốc (người dùng tải ảnh về máy khi tạo).
 Mỗi tài khoản vì vậy chỉ chiếm khoảng 1 MB cho lịch sử, cộng dung lượng các ảnh khung.
 
+### Chia sẻ mẫu & Bảng tin
+
+Người dùng đã đăng nhập có thể chia sẻ khung của mình (nút chia sẻ ở “Khung của tôi”): khung xuất hiện trên
+**Bảng tin** và có link riêng dạng `https://<project-id>.web.app/#/t/<mã>`. Ai mở Bảng tin hoặc link – kể cả
+chưa đăng nhập – đều xem và dùng được mẫu; khi dùng, mẫu được sao chép sang kho của người đó nên khung gốc
+không bị thay đổi. Quy tắc bảo mật trong `firestore.rules` chỉ cho chủ mẫu sửa / ngừng chia sẻ.
+
 ### Dùng không cần đăng nhập
 
 Khách chưa đăng nhập vẫn tạo, chỉnh và tải ảnh bình thường (kể cả hàng loạt). Khung tự tạo được lưu trong
@@ -98,6 +105,8 @@ Cấu trúc dữ liệu (chỉ chủ tài khoản được đọc/ghi – xem `f
 ```
 users/{uid}/templates/{id}        khung mẫu (vị trí khung, vùng ảnh, các text, ảnh thu nhỏ)
 users/{uid}/history/{id}          lịch sử: 10 ảnh gần nhất (ảnh xem lại + thông tin đã nhập)
+publicTemplates/{id}              mẫu chia sẻ công khai (Bảng tin) – ai cũng đọc được, chỉ chủ mẫu sửa/xoá
+publicTemplates/{id}/chunks/{n}   ảnh khung của mẫu công khai
 users/{uid}/blobs/{id}/chunks/{n} dữ liệu ảnh nhị phân
 ```
 

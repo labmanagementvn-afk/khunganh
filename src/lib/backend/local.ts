@@ -1,4 +1,4 @@
-import type { AppUser, HistoryEntry, Template } from '../../types';
+import type { AppUser, HistoryEntry, PublicTemplate, Template } from '../../types';
 import { HISTORY_LIMIT } from '../history';
 import { newId } from '../id';
 import type { Backend } from './types';
@@ -6,7 +6,7 @@ import type { Backend } from './types';
 // Chế độ demo: không cần Firebase, mọi dữ liệu lưu trong IndexedDB của trình duyệt.
 
 const DB_NAME = 'photo-frame-local';
-const STORES = ['templates', 'history', 'blobs'] as const;
+const STORES = ['templates', 'history', 'blobs', 'public'] as const;
 type StoreName = (typeof STORES)[number];
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -14,7 +14,7 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 function openDb(): Promise<IDBDatabase> {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1);
+      const req = indexedDB.open(DB_NAME, 2);
       req.onupgradeneeded = () => {
         for (const s of STORES) {
           if (!req.result.objectStoreNames.contains(s)) req.result.createObjectStore(s);
@@ -123,5 +123,55 @@ export const localBackend: Backend = {
   },
   async deleteBlob(_uid, id) {
     await delOne('blobs', id);
+  },
+
+  // Mẫu công khai: ở chế độ demo chỉ nằm trong trình duyệt này
+  async publishTemplate(owner, tpl, frame) {
+    const id = tpl.publicId || newId();
+    const old = await getOne<{ meta: PublicTemplate }>('public', id);
+    const now = Date.now();
+    const meta: PublicTemplate = {
+      id,
+      name: tpl.name,
+      width: tpl.width,
+      height: tpl.height,
+      background: tpl.background,
+      frame: tpl.frame ? { ...tpl.frame, blobId: id } : null,
+      photoSlot: tpl.photoSlot,
+      photoOnTop: tpl.photoOnTop,
+      texts: tpl.texts,
+      thumbnail: tpl.thumbnail,
+      createdAt: old?.meta.createdAt ?? now,
+      updatedAt: now,
+      ownerUid: owner.uid,
+      ownerName: owner.displayName,
+      ownerPhoto: owner.photoURL ?? null,
+      uses: old?.meta.uses ?? 0,
+      publishedAt: old?.meta.publishedAt ?? now,
+    };
+    const data = frame ? { type: frame.type, data: await frame.arrayBuffer() } : null;
+    await putOne('public', id, { meta, frame: data });
+    return id;
+  },
+  async unpublishTemplate(_owner, publicId) {
+    await delOne('public', publicId);
+  },
+  async listPublic({ limit, after, ownerUid }) {
+    const all = (await getAll<{ meta: PublicTemplate }>('public')).map((r) => r.meta);
+    return all
+      .filter((m) => (!ownerUid || m.ownerUid === ownerUid) && (!after || (m.publishedAt ?? 0) < after))
+      .sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0))
+      .slice(0, ownerUid ? undefined : limit);
+  },
+  async getPublic(publicId) {
+    return (await getOne<{ meta: PublicTemplate }>('public', publicId))?.meta ?? null;
+  },
+  async getPublicFrame(publicId) {
+    const rec = await getOne<{ frame: { type: string; data: ArrayBuffer } | null }>('public', publicId);
+    return rec?.frame ? new Blob([rec.frame.data], { type: rec.frame.type }) : null;
+  },
+  async countPublicUse(publicId) {
+    const rec = await getOne<{ meta: PublicTemplate; frame: unknown }>('public', publicId);
+    if (rec) await putOne('public', publicId, { ...rec, meta: { ...rec.meta, uses: rec.meta.uses + 1 } });
   },
 };

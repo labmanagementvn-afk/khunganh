@@ -327,3 +327,32 @@ input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--primary)
   .modal::before { content: ''; display: block; width: 40px; height: 4px; border-radius: 2px; background: #d6d3cc; margin: -6px auto 4px; }
 }
 @keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ================= Bảng tin, chia sẻ, tài khoản ================= */
+.user { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.small-text { font-size: 0.86rem; margin: 4px 0 0; }
+.mt { margin-top: 22px; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.owner { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.owner img, .owner-dot { width: 20px; height: 20px; border-radius: 50%; flex: none; object-fit: cover; }
+.owner-dot { display: inline-flex; align-items: center; justify-content: center; background: var(--text); color: #fff; font-size: 0.68rem; font-weight: 700; }
+.tpl-thumb { position: relative; text-decoration: none; }
+.public-badge { position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(24, 24, 27, 0.78); color: #fff; font-size: 0.7rem; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
+.share-head { display: flex; gap: 12px; align-items: center; }
+.share-head img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; background: #eceae4; }
+.share-head > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.share-head small { display: inline-flex; align-items: center; gap: 4px; }
+.link-box { display: flex; flex-direction: column; gap: 8px; }
+.link-box input { font-size: 14px; color: var(--muted); background: #faf9f6; }
+.public-page h1 { margin-top: 12px; }
+.public-preview { background: #eceae4; border-radius: var(--radius); overflow: hidden; display: flex; justify-content: center; margin-top: 10px; }
+.public-preview img { max-width: 100%; max-height: 60vh; display: block; }
+.public-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 8px 0; font-size: 0.86rem; }
+.back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+.profile { display: flex; align-items: center; gap: 12px; padding: 14px; }
+.profile .grow { display: flex; flex-direction: column; min-width: 0; }
+.avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex: none; display: inline-flex; align-items: center; justify-content: center; background: var(--text); color: #fff; font-weight: 700; font-size: 1.2rem; }
+.account-guest { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 14px; }
+.benefits { margin: 0; padding-left: 18px; color: var(--muted); line-height: 1.8; font-size: 0.92rem; }
+.card.empty .icon { color: var(--muted); }
+.history-thumb { display: block; }

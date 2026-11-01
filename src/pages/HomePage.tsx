@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
 import { PresetGallery } from '../components/PresetGallery';
+import { ShareTemplateModal } from '../components/ShareTemplateModal';
 import { useSession } from '../lib/auth';
 import { COLLAGE_COUNTS, firstLayoutFor } from '../lib/collageLayouts';
 import type { Template } from '../types';
@@ -32,6 +33,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<Template[] | null>(null);
   const [error, setError] = useState('');
+  const [sharing, setSharing] = useState<Template | null>(null);
 
   useEffect(() => {
     store
@@ -84,6 +86,11 @@ export default function HomePage() {
               <div key={t.id} className="tpl-card mine">
                 <button className="tpl-thumb" onClick={() => navigate(`/compose/${t.id}`)} title="Dùng khung này">
                   {t.thumbnail ? <img src={t.thumbnail} alt={t.name} /> : <Icon name="image" size={28} />}
+                  {t.publicId && (
+                    <span className="public-badge" title="Đang chia sẻ công khai">
+                      <Icon name="globe" size={13} /> Công khai
+                    </span>
+                  )}
                 </button>
                 <div className="tpl-info">
                   <strong className="ellipsis">{t.name}</strong>
@@ -95,6 +102,9 @@ export default function HomePage() {
                   <Link className="btn primary sm grow" to={`/compose/${t.id}`}>
                     Dùng
                   </Link>
+                  <button className="icon-btn" onClick={() => setSharing(t)} title="Chia sẻ" aria-label="Chia sẻ">
+                    <Icon name="share" />
+                  </button>
                   <Link className="icon-btn" to={`/batch/${t.id}`} title="Tạo hàng loạt từ nhiều ảnh" aria-label="Tạo hàng loạt">
                     <Icon name="layers" />
                   </Link>
@@ -133,6 +143,13 @@ export default function HomePage() {
       </section>
 
       <PresetGallery />
+      {sharing && (
+        <ShareTemplateModal
+          template={sharing}
+          onClose={() => setSharing(null)}
+          onChanged={(t) => setItems((xs) => xs?.map((x) => (x.id === t.id ? t : x)) ?? null)}
+        />
+      )}
     </div>
   );
 }

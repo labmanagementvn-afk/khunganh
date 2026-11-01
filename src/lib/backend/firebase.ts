@@ -15,6 +15,7 @@ import {
   getCountFromServer,
   getDoc,
   getDocs,
+  increment,
   initializeFirestore,
   limit,
   orderBy,
@@ -22,8 +23,11 @@ import {
   persistentMultipleTabManager,
   query,
   setDoc,
+  startAfter,
+  updateDoc,
+  where,
 } from 'firebase/firestore';
-import type { HistoryEntry, Template } from '../../types';
+import type { HistoryEntry, PublicTemplate, Template } from '../../types';
 import { HISTORY_LIMIT } from '../history';
 import { newId } from '../id';
 import type { Backend } from './types';
@@ -172,6 +176,101 @@ export function createFirebaseBackend(config: Record<string, string>): Backend {
         ),
       );
       blobCache.delete(id);
+    },
+
+    // ---------------- Mẫu công khai ----------------
+    // publicTemplates/{id}: thông tin mẫu (ai cũng đọc được); ảnh khung nằm ở publicTemplates/{id}/chunks/{n}.
+    // `publishedAt` chỉ được ghi sau khi ảnh khung đã lưu xong → Bảng tin không bao giờ thấy mẫu dở dang.
+    async publishTemplate(owner, tpl, frame) {
+      const id = tpl.publicId || newId();
+      const ref = doc(db, 'publicTemplates', id);
+      const existing = tpl.publicId ? await getDoc(ref) : null;
+      const now = Date.now();
+      const data: Omit<PublicTemplate, 'uses' | 'publishedAt'> = {
+        id,
+        name: tpl.name,
+        width: tpl.width,
+        height: tpl.height,
+        background: tpl.background,
+        frame: tpl.frame ? { ...tpl.frame, blobId: id } : null,
+        photoSlot: tpl.photoSlot,
+        photoOnTop: tpl.photoOnTop,
+        texts: tpl.texts,
+        thumbnail: tpl.thumbnail,
+        createdAt: existing?.exists() ? (existing.data().createdAt as number) : now,
+        updatedAt: now,
+        ownerUid: owner.uid,
+        ownerName: owner.displayName,
+        ownerPhoto: owner.photoURL ?? null,
+      };
+      if (existing?.exists()) await setDoc(ref, clean(data), { merge: true });
+      else await setDoc(ref, clean({ ...data, uses: 0 }));
+
+      const oldChunks = existing?.exists() ? ((existing.data().frameChunks as number) ?? 0) : 0;
+      let chunks = 0;
+      if (frame) {
+        const bytes = new Uint8Array(await frame.arrayBuffer());
+        chunks = Math.max(1, Math.ceil(bytes.length / CHUNK_SIZE));
+        for (let i = 0; i < chunks; i++) {
+          await setDoc(doc(db, 'publicTemplates', id, 'chunks', String(i)), {
+            data: Bytes.fromUint8Array(bytes.subarray(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)),
+          });
+        }
+      }
+      for (let i = chunks; i < oldChunks; i++) await deleteDoc(doc(db, 'publicTemplates', id, 'chunks', String(i)));
+      await updateDoc(ref, {
+        frameChunks: chunks,
+        frameType: frame?.type ?? null,
+        ...(existing?.exists() && existing.data().publishedAt ? {} : { publishedAt: now }),
+      });
+      blobCache.delete('public:' + id);
+      return id;
+    },
+    async unpublishTemplate(_owner, publicId) {
+      const ref = doc(db, 'publicTemplates', publicId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      // Xoá ảnh trước: quy tắc bảo mật của chunk kiểm tra chủ sở hữu qua tài liệu cha
+      const chunks = (snap.data().frameChunks as number) ?? 0;
+      await Promise.all(Array.from({ length: chunks }, (_, i) => deleteDoc(doc(db, 'publicTemplates', publicId, 'chunks', String(i)))));
+      await deleteDoc(ref);
+    },
+    async listPublic({ limit: n, after, ownerUid }) {
+      const col = collection(db, 'publicTemplates');
+      const q = ownerUid
+        ? query(col, where('ownerUid', '==', ownerUid))
+        : after
+          ? query(col, orderBy('publishedAt', 'desc'), startAfter(after), limit(n))
+          : query(col, orderBy('publishedAt', 'desc'), limit(n));
+      const snap = await getDocs(q);
+      const list = snap.docs.map((d) => ({ ...(d.data() as PublicTemplate), id: d.id }));
+      // Lọc theo chủ sở hữu không cần chỉ mục ghép: sắp xếp phía trình duyệt
+      return ownerUid ? list.filter((x) => x.publishedAt).sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0)) : list;
+    },
+    async getPublic(publicId) {
+      const snap = await getDoc(doc(db, 'publicTemplates', publicId));
+      if (!snap.exists() || !snap.data().publishedAt) return null;
+      return { ...(snap.data() as PublicTemplate), id: snap.id };
+    },
+    async getPublicFrame(publicId) {
+      const key = 'public:' + publicId;
+      const cached = blobCache.get(key);
+      if (cached) return cached;
+      const snap = await getDoc(doc(db, 'publicTemplates', publicId));
+      const chunks = snap.exists() ? ((snap.data().frameChunks as number) ?? 0) : 0;
+      if (!chunks) return null;
+      const parts = await Promise.all(
+        Array.from({ length: chunks }, (_, i) =>
+          getDoc(doc(db, 'publicTemplates', publicId, 'chunks', String(i))).then((c) => (c.data()!.data as Bytes).toUint8Array()),
+        ),
+      );
+      const blob = new Blob(parts as BlobPart[], { type: (snap.data()!.frameType as string) || 'image/png' });
+      blobCache.set(key, blob);
+      return blob;
+    },
+    async countPublicUse(publicId) {
+      if (!auth.currentUser) return;
+      await updateDoc(doc(db, 'publicTemplates', publicId), { uses: increment(1) }).catch(() => {});
     },
   };
   return api;

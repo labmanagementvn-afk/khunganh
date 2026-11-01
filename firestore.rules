@@ -6,5 +6,27 @@ service cloud.firestore {
     match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Mẫu khung được chia sẻ công khai (Bảng tin / link chia sẻ)
+    match /publicTemplates/{pid} {
+      // Ai cũng xem được, kể cả khách chưa đăng nhập
+      allow read: if true;
+      // Chỉ người đăng nhập tạo mẫu đứng tên chính mình
+      allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
+      // Chủ mẫu sửa được (không đổi chủ); người đăng nhập khác chỉ được tăng bộ đếm "uses" thêm 1
+      allow update: if request.auth != null && (
+        (resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == request.auth.uid)
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uses'])
+            && request.resource.data.uses == resource.data.uses + 1)
+      );
+      allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+
+      // Ảnh khung của mẫu, chia thành các khối < 1 MiB
+      match /chunks/{n} {
+        allow read: if true;
+        allow write: if request.auth != null
+          && get(/databases/$(database)/documents/publicTemplates/$(pid)).data.ownerUid == request.auth.uid;
+      }
+    }
   }
 }

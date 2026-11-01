@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Icon } from '../components/Icon';
+import { Icon } from './Icon';
 import { Link } from 'react-router-dom';
-import { ResultModal } from '../components/ResultModal';
+import { ResultModal } from './ResultModal';
 import { useSession } from '../lib/auth';
 import { HISTORY_LIMIT } from '../lib/history';
 import { safeFileName } from '../lib/share';
 import type { HistoryEntry } from '../types';
 
-export default function HistoryPage() {
+/** Lịch sử tạo ảnh – hiển thị trong trang Tài khoản */
+export function HistorySection() {
   const { uid, store, guest } = useSession();
   const [items, setItems] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState('');
@@ -51,25 +52,12 @@ export default function HistoryPage() {
       .map(([k, v]) => `${k}: ${v}`)
       .join(' · ');
 
-  if (guest) {
-    return (
-      <div className="page narrow">
-        <h1>Lịch sử tạo ảnh</h1>
-        <div className="card empty">
-          <p className="muted">Bạn đang dùng không đăng nhập nên ảnh tạo ra không được lưu lịch sử.</p>
-          <p className="muted">Đăng nhập bằng Gmail để xem lại {HISTORY_LIMIT} ảnh gần nhất và dùng khung mẫu trên mọi thiết bị.</p>
-          <Link to="/login" className="btn primary lg">
-            Đăng nhập bằng Google
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  if (guest) return null;
 
   return (
-    <div className="page">
-      <div className="toolbar">
-        <h1 className="grow">Lịch sử tạo ảnh</h1>
+    <section className="section">
+      <div className="section-head">
+        <h2>Lịch sử tạo ảnh</h2>
       </div>
       <p className="hint">Lưu {HISTORY_LIMIT} ảnh gần nhất (ảnh xem lại cỡ vừa). Ảnh gốc độ phân giải đầy đủ hãy tải về máy khi tạo.</p>
       {error && <p className="error">{error}</p>}
@@ -95,10 +83,10 @@ export default function HistoryPage() {
             </div>
             <div className="history-actions">
               <Link className="btn ghost sm" to={e.templateId === 'collage' ? '/collage' : `/compose/${e.templateId}`} title="Dùng lại khung">
-                <Icon name="reset" /> 
+                <Icon name="reset" />
               </Link>
               <button className="btn ghost sm" onClick={() => remove(e)} title="Xoá">
-                <Icon name="trash" /> 
+                <Icon name="trash" />
               </button>
             </div>
           </div>
@@ -119,6 +107,6 @@ export default function HistoryPage() {
           }
         />
       )}
-    </div>
+    </section>
   );
 }
