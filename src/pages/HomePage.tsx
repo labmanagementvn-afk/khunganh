@@ -98,22 +98,24 @@ export default function HomePage() {
                     {t.width}×{t.height} · {t.texts.filter((x) => x.kind === 'input').length} ô nhập
                   </small>
                 </div>
-                <div className="tpl-actions">
-                  <Link className="btn primary sm grow" to={`/compose/${t.id}`}>
-                    Dùng
+                <div className="tpl-actions mine-actions">
+                  <Link className="btn primary sm use-btn" to={`/compose/${t.id}`}>
+                    Dùng khung
                   </Link>
-                  <button className="icon-btn" onClick={() => setSharing(t)} title="Chia sẻ" aria-label="Chia sẻ">
-                    <Icon name="share" />
-                  </button>
-                  <Link className="icon-btn" to={`/batch/${t.id}`} title="Tạo hàng loạt từ nhiều ảnh" aria-label="Tạo hàng loạt">
-                    <Icon name="layers" />
-                  </Link>
-                  <Link className="icon-btn" to={`/templates/${t.id}/edit`} title="Sửa khung" aria-label="Sửa khung">
-                    <Icon name="edit" />
-                  </Link>
-                  <button className="icon-btn" onClick={() => remove(t)} title="Xoá khung" aria-label="Xoá khung">
-                    <Icon name="trash" />
-                  </button>
+                  <div className="icon-row">
+                    <button className="icon-btn" onClick={() => setSharing(t)} title="Chia sẻ" aria-label="Chia sẻ">
+                      <Icon name="share" />
+                    </button>
+                    <Link className="icon-btn" to={`/batch/${t.id}`} title="Tạo hàng loạt từ nhiều ảnh" aria-label="Tạo hàng loạt">
+                      <Icon name="layers" />
+                    </Link>
+                    <Link className="icon-btn" to={`/templates/${t.id}/edit`} title="Sửa khung" aria-label="Sửa khung">
+                      <Icon name="edit" />
+                    </Link>
+                    <button className="icon-btn" onClick={() => remove(t)} title="Xoá khung" aria-label="Xoá khung">
+                      <Icon name="trash" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
