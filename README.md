@@ -61,6 +61,23 @@ không đăng nhập Google, dữ liệu lưu trong trình duyệt (IndexedDB).
 > Nếu deploy lên tên miền khác (Vercel, Netlify, GitHub Pages…), thêm tên miền đó vào
 > **Authentication → Settings → Authorized domains**.
 
+### Tự động deploy bằng GitHub Actions (khuyên dùng)
+
+Workflow `.github/workflows/deploy.yml` tự build và deploy (Hosting + Firestore rules) mỗi khi có commit vào `main`,
+hoặc chạy tay ở tab **Actions → Deploy to Firebase → Run workflow**. Chỉ cần cài đặt một lần:
+
+1. **Cấu hình web** – trong GitHub repo: **Settings → Secrets and variables → Actions → tab Variables → New repository variable**,
+   tạo 5 biến với giá trị lấy ở bước 4 phía trên:
+   `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`,
+   `VITE_FIREBASE_MESSAGING_SENDER_ID`.
+2. **Tài khoản dịch vụ để deploy** – mở <https://console.cloud.google.com/iam-admin/serviceaccounts> (chọn đúng project)
+   → **Create service account** (vd tên `github-deploy`) → gán các role:
+   **Firebase Admin**, **API Keys Viewer**, **Service Usage Consumer** → Done.
+   Bấm vào tài khoản vừa tạo → **Keys → Add key → Create new key → JSON** → tải file về.
+3. Trong GitHub: **Settings → Secrets and variables → Actions → tab Secrets → New repository secret**,
+   tên `FIREBASE_SERVICE_ACCOUNT`, dán **toàn bộ nội dung file JSON** vào. Sau đó xoá file JSON khỏi máy.
+4. Vào tab **Actions → Deploy to Firebase → Run workflow**. Khi xong, app chạy tại `https://<project-id>.web.app`.
+
 ### Lưu trữ ảnh
 
 Ảnh khung và ảnh kết quả được lưu trực tiếp trong Firestore (chia thành các khối < 1 MB) nên **không cần
