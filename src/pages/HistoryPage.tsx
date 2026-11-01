@@ -93,7 +93,7 @@ export default function HistoryPage() {
               </small>
             </div>
             <div className="history-actions">
-              <Link className="btn ghost sm" to={`/compose/${e.templateId}`} title="Dùng lại khung">
+              <Link className="btn ghost sm" to={e.templateId === 'collage' ? '/collage' : `/compose/${e.templateId}`} title="Dùng lại khung">
                 ↻
               </Link>
               <button className="btn ghost sm" onClick={() => remove(e)} title="Xoá">
