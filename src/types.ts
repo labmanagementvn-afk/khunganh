@@ -58,6 +58,24 @@ export interface Template {
   thumbnail: string;
   createdAt: number;
   updatedAt: number;
+  /** Ngành (dùng để lọc trên Bảng tin) */
+  category?: string;
+  /** Mã bản chia sẻ công khai (nếu chủ khung đã chia sẻ) */
+  publicId?: string;
+  /** Khung được sao chép từ mẫu công khai nào */
+  sourcePublicId?: string;
+}
+
+/** Mẫu khung được chia sẻ công khai – ai cũng xem và dùng được */
+export interface PublicTemplate extends Omit<Template, 'publicId' | 'sourcePublicId' | 'frame'> {
+  frame: (Rect & { blobId: string }) | null;
+  ownerUid: string;
+  ownerName: string;
+  ownerPhoto: string | null;
+  /** Số lần người khác dùng mẫu này */
+  uses: number;
+  /** Có giá trị khi đã sẵn sàng hiển thị trên Bảng tin */
+  publishedAt?: number;
 }
 
 export interface HistoryEntry {

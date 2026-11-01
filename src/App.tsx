@@ -1,18 +1,28 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { HashRouter, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { Icon } from './components/Icon';
-import { backend } from './lib/backend';
 import { AuthProvider, useAuth } from './lib/auth';
+import AccountPage from './pages/AccountPage';
 import BatchPage from './pages/BatchPage';
 import CollagePage from './pages/CollagePage';
 import ComposePage from './pages/ComposePage';
-import HistoryPage from './pages/HistoryPage';
+import FeedPage from './pages/FeedPage';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
+import PublicTemplatePage from './pages/PublicTemplatePage';
 import TemplateEditorPage from './pages/TemplateEditorPage';
 
 /** Trang cấp cao nhất – hiện thanh điều hướng dưới đáy trên điện thoại */
-const TOP_LEVEL = ['/', '/collage', '/history', '/login'];
+const TOP_LEVEL = ['/', '/feed', '/collage', '/account'];
+
+/** Mở trang mới luôn bắt đầu từ đầu trang (trình duyệt không tự làm với điều hướng trong app) */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
 
 function Shell({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -20,13 +30,9 @@ function Shell({ children }: { children: ReactNode }) {
   if (loading) return <div className="page center"><div className="spinner" /></div>;
 
   const account = user ? (
-    <button
-      className="user"
-      title={`${user.displayName}\n${user.email}\nNhấn để đăng xuất`}
-      onClick={() => confirm(`Đăng xuất khỏi ${user.email || user.displayName}?`) && backend.signOut()}
-    >
+    <NavLink to="/account" className="user" title={`${user.displayName}\n${user.email}`}>
       {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" /> : <span>{user.displayName.charAt(0).toUpperCase()}</span>}
-    </button>
+    </NavLink>
   ) : (
     <NavLink to="/login" className="btn primary sm">
       Đăng nhập
@@ -43,7 +49,7 @@ function Shell({ children }: { children: ReactNode }) {
         <nav className="top-nav">
           <NavLink to="/" end>Khung mẫu</NavLink>
           <NavLink to="/collage">Ghép ảnh</NavLink>
-          <NavLink to="/history">Lịch sử</NavLink>
+          <NavLink to="/feed">Bảng tin</NavLink>
         </nav>
         <div className="header-account">{account}</div>
       </header>
@@ -57,21 +63,14 @@ function Shell({ children }: { children: ReactNode }) {
           <Icon name="grid" size={22} />
           <span>Ghép ảnh</span>
         </NavLink>
-        <NavLink to="/history">
-          <Icon name="clock" size={22} />
-          <span>Lịch sử</span>
+        <NavLink to="/feed">
+          <Icon name="feed" size={22} />
+          <span>Bảng tin</span>
         </NavLink>
-        {user ? (
-          <button onClick={() => confirm(`Đăng xuất khỏi ${user.email || user.displayName}?`) && backend.signOut()}>
-            <Icon name="user" size={22} />
-            <span>Tài khoản</span>
-          </button>
-        ) : (
-          <NavLink to="/login">
-            <Icon name="user" size={22} />
-            <span>Đăng nhập</span>
-          </NavLink>
-        )}
+        <NavLink to="/account">
+          <Icon name="user" size={22} />
+          <span>Tài khoản</span>
+        </NavLink>
       </nav>
     </div>
   );
@@ -81,10 +80,14 @@ export default function App() {
   return (
     <AuthProvider>
       <HashRouter>
+        <ScrollToTop />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<Shell><HomePage /></Shell>} />
-          <Route path="/history" element={<Shell><HistoryPage /></Shell>} />
+          <Route path="/feed" element={<Shell><FeedPage /></Shell>} />
+          <Route path="/t/:id" element={<Shell><PublicTemplatePage /></Shell>} />
+          <Route path="/account" element={<Shell><AccountPage /></Shell>} />
+          <Route path="/history" element={<Navigate to="/account" replace />} />
           <Route path="/templates/new" element={<Shell><TemplateEditorPage key="new" /></Shell>} />
           <Route path="/templates/:id/edit" element={<Shell><TemplateEditorPage /></Shell>} />
           <Route path="/compose/:id" element={<Shell><ComposePage /></Shell>} />

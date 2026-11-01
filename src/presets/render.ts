@@ -98,6 +98,7 @@ export async function createTemplateFromPreset(backend: Backend, uid: string, pr
   const tpl: Template = {
     id: newId(),
     name: preset.name,
+    category: preset.category,
     width: preset.width,
     height: preset.height,
     background: preset.background,

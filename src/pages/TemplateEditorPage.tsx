@@ -14,6 +14,7 @@ import { useFitScale } from '../components/useFitScale';
 import { useSession } from '../lib/auth';
 import { useFontsReady } from '../lib/fonts';
 import { newId } from '../lib/id';
+import { INDUSTRIES } from '../lib/industries';
 import { slotClip } from '../lib/geometry';
 import { blobToImage, makeThumbnail, prepareImageFile } from '../lib/image';
 import type { PhotoSlot, Rect as R, Template, TextElement } from '../types';
@@ -566,6 +567,17 @@ export default function TemplateEditorPage() {
         <div className="side-col">
           <h3>Cài đặt khung</h3>
           <div className="panel">
+            <label className="field">
+              <span>Ngành</span>
+              <select value={tpl.category ?? ''} onChange={(e) => update({ category: e.target.value || undefined })}>
+                <option value="">Chưa chọn</option>
+                {INDUSTRIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="field">
               <span>Kích thước ảnh xuất</span>
               <select

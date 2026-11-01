@@ -25,11 +25,13 @@ export interface Session {
   store: Backend;
   /** Khách (chưa đăng nhập): vẫn tạo được ảnh nhưng không lưu lịch sử */
   guest: boolean;
+  /** Kho mẫu công khai (Bảng tin) – dùng chung cho mọi người, kể cả khách */
+  pub: Backend;
 }
 
-const GUEST: Session = { user: null, uid: 'guest', store: localBackend, guest: true };
+const GUEST: Session = { user: null, uid: 'guest', store: localBackend, guest: true, pub: backend };
 
 export function useSession(): Session {
   const { user } = useAuth();
-  return user ? { user, uid: user.uid, store: backend, guest: false } : GUEST;
+  return user ? { user, uid: user.uid, store: backend, guest: false, pub: backend } : GUEST;
 }

@@ -52,3 +52,15 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
           npx --yes firebase-tools@13 deploy --only hosting,firestore:rules --project "$VITE_FIREBASE_PROJECT_ID" --non-interactive
           rm -f "$RUNNER_TEMP/sa.json"
+
+      # Chỉ mục Firestore (lọc Bảng tin theo ngành). Tách riêng và cho phép lỗi: nếu tài khoản dịch vụ
+      # thiếu quyền tạo chỉ mục, website vẫn được cập nhật và app tự dùng cách truy vấn dự phòng.
+      - name: Deploy Firestore indexes
+        continue-on-error: true
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx --yes firebase-tools@13 deploy --only firestore:indexes --project "$VITE_FIREBASE_PROJECT_ID" --non-interactive
+          rm -f "$RUNNER_TEMP/sa.json"
