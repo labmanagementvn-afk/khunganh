@@ -33,6 +33,8 @@ function PresetCard({ preset, busy, disabled, onUse }: { preset: Preset; busy: b
   );
 }
 
+const BIG_PHOTO = '🖼️ Ảnh lớn';
+
 /** Thư viện khung mẫu có sẵn: chọn một mẫu sẽ tạo bản sao vào "Khung mẫu của tôi" */
 export function PresetGallery() {
   const user = useUser();
@@ -40,7 +42,12 @@ export function PresetGallery() {
   const [category, setCategory] = useState<string>('Tất cả');
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
-  const list = category === 'Tất cả' ? PRESETS : PRESETS.filter((p) => p.category === category);
+  const list =
+    category === 'Tất cả'
+      ? PRESETS
+      : category === BIG_PHOTO
+        ? PRESETS.filter((p) => p.photoFirst)
+        : PRESETS.filter((p) => p.category === category);
 
   async function use(preset: Preset) {
     setBusyId(preset.id);
@@ -61,7 +68,7 @@ export function PresetGallery() {
       </div>
       <p className="hint">Chọn một mẫu để tạo khung của riêng bạn – sau đó có thể đổi chữ, màu, vị trí tuỳ ý.</p>
       <div className="chips">
-        {['Tất cả', ...PRESET_CATEGORIES].map((c) => (
+        {['Tất cả', BIG_PHOTO, ...PRESET_CATEGORIES].map((c) => (
           <button key={c} className={c === category ? 'chip on' : 'chip'} onClick={() => setCategory(c)}>
             {c}
           </button>

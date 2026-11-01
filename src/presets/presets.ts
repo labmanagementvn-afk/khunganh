@@ -1,5 +1,7 @@
 import type { PhotoSlot, TextElement } from '../types';
+import { MINIMAL_PRESETS } from './presetsMinimal';
 import { arch, circle, frameSvg, leaf, roundRect, sparkle } from './svg';
+import { fixed, input } from './text';
 
 export const PRESET_CATEGORIES = ['Sản phẩm', 'Bất động sản', 'Ẩm thực', 'Thời trang', 'Làm đẹp', 'Công nghệ'] as const;
 export type PresetCategory = (typeof PRESET_CATEGORIES)[number];
@@ -16,32 +18,10 @@ export interface Preset {
   /** Ảnh khung SVG (vùng ảnh sản phẩm trong suốt) */
   svg: string;
   texts: TextElement[];
+  /** Mẫu tối giản: ảnh chiếm gần hết khung */
+  photoFirst?: boolean;
   /** Ảnh minh hoạ dùng cho ảnh xem trước của mẫu */
   sample: { from: string; to: string; emoji: string };
-}
-
-type TextOpts = Partial<TextElement> & Pick<TextElement, 'text' | 'x' | 'y' | 'width' | 'fontSize'>;
-
-function fixed(id: string, o: TextOpts): TextElement {
-  return {
-    id,
-    kind: 'fixed',
-    label: '',
-    rotation: 0,
-    fontFamily: 'Be Vietnam Pro',
-    fontStyle: 'bold',
-    fill: '#111111',
-    align: 'left',
-    stroke: '#ffffff',
-    strokeWidth: 0,
-    uppercase: false,
-    letterSpacing: 0,
-    ...o,
-  };
-}
-
-function input(id: string, label: string, o: TextOpts): TextElement {
-  return { ...fixed(id, o), kind: 'input', label };
 }
 
 // ---------------------------------------------------------------------------
@@ -487,4 +467,5 @@ export const PRESETS: Preset[] = [
   beautyArch,
   spaNature,
   techNeon,
+  ...MINIMAL_PRESETS,
 ];
