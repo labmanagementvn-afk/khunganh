@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { FilterPicker } from '../components/PhotoAdjustPanels';
-import { backend } from '../lib/backend';
-import { useUser } from '../lib/auth';
+import { useSession } from '../lib/auth';
 import { defaultValues, ensureFonts, renderComposite } from '../lib/compose';
+import { HISTORY_LIMIT, historyEntry } from '../lib/history';
 import { newId } from '../lib/id';
 import { blobToImage, canvasToBlob, makeThumbnail, prepareImageFile } from '../lib/image';
 import { DEFAULT_ADJUST, autoBeautify, type PhotoAdjust } from '../lib/photoFilters';
@@ -30,7 +30,7 @@ const isCodeLabel = (label: string) => /mã|ma sp|code|sku/i.test(label);
 
 export default function BatchPage() {
   const { id } = useParams();
-  const user = useUser();
+  const { uid, store, guest } = useSession();
   const [tpl, setTpl] = useState<Template | null>(null);
   const [frameImg, setFrameImg] = useState<HTMLImageElement | null>(null);
   const [items, setItems] = useState<Item[]>([]);
@@ -50,10 +50,10 @@ export default function BatchPage() {
     let alive = true;
     (async () => {
       try {
-        const t = await backend.getTemplate(user.uid, id!);
+        const t = await store.getTemplate(uid, id!);
         if (!t) throw new Error('Không tìm thấy khung mẫu');
         await ensureFonts(t.texts);
-        const img = t.frame ? await blobToImage(await backend.getBlob(user.uid, t.frame.blobId)) : null;
+        const img = t.frame ? await blobToImage(await store.getBlob(uid, t.frame.blobId)) : null;
         if (!alive) return;
         setTpl(t);
         setFrameImg(img);
@@ -67,7 +67,7 @@ export default function BatchPage() {
     return () => {
       alive = false;
     };
-  }, [id, user.uid]);
+  }, [id, uid]);
 
   const labels = useMemo(() => (tpl ? Object.keys(defaultValues(tpl.texts)) : []), [tpl]);
   const valuesOf = (it: Item) => {
@@ -148,23 +148,14 @@ export default function BatchPage() {
         const filename = `${String(i + 1).padStart(2, '0')}-${safeFileName(perImage.length ? valuesOf(it)[perImage[0]] || it.name : code)}.${format === 'image/png' ? 'png' : 'jpg'}`;
         const url = URL.createObjectURL(blob);
         updateItem(it.id, { result: { blob, url, filename }, error: undefined });
-        try {
-          const resultBlobId = await backend.putBlob(user.uid, blob);
-          await backend.addHistory(user.uid, {
-            id: newId(),
-            templateId: tpl.id,
-            templateName: tpl.name,
-            inputs: valuesOf(it),
-            thumbnail: makeThumbnail(canvas),
-            resultBlobId,
-            mime: format,
-            width: canvas.width,
-            height: canvas.height,
-            createdAt: Date.now(),
-          });
-          saved++;
-        } catch {
-          // Lỗi lưu lịch sử không chặn việc tạo ảnh
+        // Lịch sử chỉ giữ HISTORY_LIMIT mục: chỉ lưu các ảnh cuối của lượt này
+        if (!guest && i >= items.length - HISTORY_LIMIT) {
+          try {
+            await store.addHistory(uid, historyEntry(tpl, valuesOf(it), canvas, format));
+            saved++;
+          } catch {
+            // Lỗi lưu lịch sử không chặn việc tạo ảnh
+          }
         }
       } catch (e) {
         updateItem(it.id, { error: (e as Error).message });
@@ -172,7 +163,15 @@ export default function BatchPage() {
       setProgress({ done: i + 1, total: items.length });
       await new Promise((r) => setTimeout(r, 0));
     }
-    setNotice(`✓ Đã tạo ${items.length} ảnh${saved === items.length ? ' và lưu vào lịch sử' : ` (lưu lịch sử ${saved}/${items.length})`}.`);
+    const toSave = guest ? 0 : Math.min(items.length, HISTORY_LIMIT);
+    setNotice(
+      `✓ Đã tạo ${items.length} ảnh. ` +
+        (guest
+          ? 'Bạn chưa đăng nhập nên ảnh không được lưu lịch sử – nhớ lưu ảnh về máy.'
+          : saved === toSave
+            ? `Đã lưu ${saved} ảnh gần nhất vào lịch sử.`
+            : `Lưu lịch sử ${saved}/${toSave} ảnh.`),
+    );
     setTimeout(() => document.getElementById('batch-results')?.scrollIntoView({ behavior: 'smooth' }), 50);
   }
 

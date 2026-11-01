@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { AppUser } from '../types';
-import { backend } from './backend';
+import { backend, type Backend } from './backend';
+import { localBackend } from './backend/local';
 
 interface AuthState {
   user: AppUser | null;
@@ -17,9 +18,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export const useAuth = () => useContext(AuthContext);
 
-/** Dùng trong các trang đã được bảo vệ bởi RequireAuth */
-export function useUser(): AppUser {
+export interface Session {
+  user: AppUser | null;
+  uid: string;
+  /** Nơi lưu khung mẫu: Firebase khi đã đăng nhập, bộ nhớ trình duyệt khi dùng không đăng nhập */
+  store: Backend;
+  /** Khách (chưa đăng nhập): vẫn tạo được ảnh nhưng không lưu lịch sử */
+  guest: boolean;
+}
+
+const GUEST: Session = { user: null, uid: 'guest', store: localBackend, guest: true };
+
+export function useSession(): Session {
   const { user } = useAuth();
-  if (!user) throw new Error('Chưa đăng nhập');
-  return user;
+  return user ? { user, uid: user.uid, store: backend, guest: false } : GUEST;
 }

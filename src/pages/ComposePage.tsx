@@ -12,14 +12,14 @@ import { useAdjustedPhoto } from '../components/useAdjustedPhoto';
 import { useArrowNudge } from '../components/useArrowNudge';
 import { useHistory, useUndoRedoKeys } from '../components/useHistory';
 import { useFitScale } from '../components/useFitScale';
-import { backend } from '../lib/backend';
-import { useUser } from '../lib/auth';
+import { useSession } from '../lib/auth';
 import { useFontsReady } from '../lib/fonts';
 import { slotClip } from '../lib/geometry';
 import { defaultValues, fitScale, labelOf, normalizeAngle } from '../lib/compose';
+import { historyEntry } from '../lib/history';
 import { newId } from '../lib/id';
 import { DEFAULT_ADJUST, isIdentity, renderAdjusted, type PhotoAdjust } from '../lib/photoFilters';
-import { blobToImage, canvasToBlob, makeThumbnail, prepareImageFile } from '../lib/image';
+import { blobToImage, canvasToBlob, prepareImageFile } from '../lib/image';
 import { safeFileName } from '../lib/share';
 import type { Template, TextElement } from '../types';
 
@@ -51,7 +51,7 @@ export default function ComposePage() {
   const { id } = useParams();
   const [params, setParams] = useSearchParams();
   const fromPreset = params.get('new') === '1';
-  const user = useUser();
+  const { uid, store, guest } = useSession();
 
   const [tpl, setTpl] = useState<Template | null>(null);
   const [frameImg, setFrameImg] = useState<HTMLImageElement | null>(null);
@@ -76,7 +76,7 @@ export default function ComposePage() {
   const [format, setFormat] = useState<'image/jpeg' | 'image/png'>('image/jpeg');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<{ blob: Blob; name: string; saved: 'saving' | 'saved' | 'error' } | null>(null);
+  const [result, setResult] = useState<{ blob: Blob; name: string; saved: 'saving' | 'saved' | 'error' | 'guest' } | null>(null);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -91,14 +91,14 @@ export default function ComposePage() {
     let alive = true;
     (async () => {
       try {
-        const t = await backend.getTemplate(user.uid, id!);
+        const t = await store.getTemplate(uid, id!);
         if (!t) throw new Error('Không tìm thấy khung mẫu');
         if (!alive) return;
         setTpl(t);
         const init = defaultValues(t.texts);
         history.reset({ photo: null, values: init, texts: t.texts, extras: [] });
         if (t.frame) {
-          const img = await blobToImage(await backend.getBlob(user.uid, t.frame.blobId));
+          const img = await blobToImage(await store.getBlob(uid, t.frame.blobId));
           if (alive) setFrameImg(img);
         }
       } catch (e) {
@@ -108,7 +108,7 @@ export default function ComposePage() {
     return () => {
       alive = false;
     };
-  }, [id, user.uid]);
+  }, [id, uid]);
 
   useEffect(() => {
     const tr = trRef.current;
@@ -290,26 +290,12 @@ export default function ComposePage() {
       const blob = await canvasToBlob(canvas, format, format === 'image/jpeg' ? 0.92 : undefined);
       const code = Object.values(values).filter(Boolean).join('_');
       const name = `${safeFileName(code || tpl.name)}-${Date.now().toString(36)}.${format === 'image/png' ? 'png' : 'jpg'}`;
-      setResult({ blob, name, saved: 'saving' });
+      setResult({ blob, name, saved: guest ? 'guest' : 'saving' });
 
+      if (guest) return;
       // Lưu lịch sử (chạy nền)
-      const thumbnail = makeThumbnail(canvas);
-      backend
-        .putBlob(user.uid, blob)
-        .then((resultBlobId) =>
-          backend.addHistory(user.uid, {
-            id: newId(),
-            templateId: tpl.id,
-            templateName: tpl.name,
-            inputs: values,
-            thumbnail,
-            resultBlobId,
-            mime: format,
-            width: canvas.width,
-            height: canvas.height,
-            createdAt: Date.now(),
-          }),
-        )
+      store
+        .addHistory(uid, historyEntry(tpl, values, canvas, format))
         .then(() => setResult((r) => (r && r.blob === blob ? { ...r, saved: 'saved' } : r)))
         .catch(() => setResult((r) => (r && r.blob === blob ? { ...r, saved: 'error' } : r)));
     } catch (e) {
@@ -384,7 +370,7 @@ export default function ComposePage() {
     setSavingStyle('saving');
     try {
       const updated = { ...tpl, texts, updatedAt: Date.now() };
-      await backend.saveTemplate(user.uid, updated);
+      await store.saveTemplate(uid, updated);
       setTpl(updated);
       setSavingStyle('saved');
     } catch (e) {
@@ -699,11 +685,13 @@ export default function ComposePage() {
           blob={result.blob}
           filename={result.name}
           status={
-            result.saved === 'saving'
-              ? 'Đang lưu vào lịch sử…'
-              : result.saved === 'saved'
-                ? '✓ Đã lưu vào lịch sử'
-                : '⚠ Không lưu được lịch sử'
+            result.saved === 'guest'
+              ? 'Bạn đang dùng không đăng nhập nên ảnh không được lưu vào lịch sử – nhớ tải ảnh về máy.'
+              : result.saved === 'saving'
+                ? 'Đang lưu vào lịch sử…'
+                : result.saved === 'saved'
+                  ? '✓ Đã lưu vào lịch sử'
+                  : '⚠ Không lưu được lịch sử'
           }
           onClose={() => setResult(null)}
           extraAction={

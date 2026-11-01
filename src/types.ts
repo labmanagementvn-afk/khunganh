@@ -66,8 +66,10 @@ export interface HistoryEntry {
   templateName: string;
   /** Giá trị đã nhập: { [label]: value } */
   inputs: Record<string, string>;
+  /** Ảnh xem lại (data URL JPEG, cạnh dài ≤720px) */
   thumbnail: string;
-  resultBlobId: string;
+  /** Chỉ có ở mục lịch sử cũ: file ảnh gốc lưu riêng */
+  resultBlobId?: string;
   mime: string;
   width: number;
   height: number;

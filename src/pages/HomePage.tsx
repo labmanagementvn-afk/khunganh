@@ -1,27 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PresetGallery } from '../components/PresetGallery';
-import { backend } from '../lib/backend';
-import { useUser } from '../lib/auth';
+import { useSession } from '../lib/auth';
 import type { Template } from '../types';
 
 export default function HomePage() {
-  const user = useUser();
+  const { uid, store, guest } = useSession();
   const navigate = useNavigate();
   const [items, setItems] = useState<Template[] | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    backend
-      .listTemplates(user.uid)
+    store
+      .listTemplates(uid)
       .then(setItems)
       .catch((e) => setError((e as Error).message));
-  }, [user.uid]);
+  }, [uid]);
 
   async function remove(t: Template) {
     if (!confirm(`Xoá khung "${t.name}"?`)) return;
-    await backend.deleteTemplate(user.uid, t.id);
-    if (t.frame?.blobId) backend.deleteBlob(user.uid, t.frame.blobId).catch(() => {});
+    await store.deleteTemplate(uid, t.id);
+    if (t.frame?.blobId) store.deleteBlob(uid, t.frame.blobId).catch(() => {});
     setItems((xs) => xs?.filter((x) => x.id !== t.id) ?? null);
   }
 
@@ -33,6 +32,17 @@ export default function HomePage() {
           ＋ Tạo khung mới
         </Link>
       </div>
+      {guest && (
+        <div className="banner info">
+          <span>
+            Bạn đang dùng không đăng nhập: khung mẫu lưu trên máy này, ảnh tạo ra không lưu lịch sử. Đăng nhập Gmail để lưu lịch
+            sử và dùng khung trên mọi thiết bị.
+          </span>
+          <Link to="/login" className="btn sm">
+            Đăng nhập
+          </Link>
+        </div>
+      )}
       {error && <p className="error">{error}</p>}
       {!items && !error && <div className="center"><div className="spinner" /></div>}
       {items && items.length === 0 && (
