@@ -175,3 +175,6 @@ input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--primary)
 .undo-bar .btn { min-height: 44px; }
 .undo-bar .btn:disabled { color: #a3a7b8; }
 .seg button:disabled { color: #b8bbc9; cursor: not-allowed; background: var(--surface); }
+.panel.settings { border: 1.5px solid var(--primary); box-shadow: 0 0 0 3px var(--primary-soft), var(--shadow); }
+.settings-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px -6px -4px 0; }
+.settings-head h3 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

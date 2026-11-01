@@ -2,6 +2,7 @@ import type Konva from 'konva';
 import { useEffect, useRef, useState } from 'react';
 import { Group, Image as KImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
 import { useNavigate, useParams } from 'react-router-dom';
+import { SettingsPanel } from '../components/SettingsPanel';
 import { TextNode, createTextElement } from '../components/TextNode';
 import { TextPropsPanel } from '../components/TextPropsPanel';
 import { UndoRedoButtons } from '../components/UndoRedoButtons';
@@ -466,20 +467,11 @@ export default function TemplateEditorPage() {
               </button>
             ))}
           </div>
-          <div className="row wrap">
-            <button className="btn" onClick={() => addText('fixed')}>
-              ＋ Text cố định
-            </button>
-            <button className="btn" onClick={() => addText('input')}>
-              ＋ Text nhập (input)
-            </button>
-          </div>
-        </div>
-
-        <div className="side-col">
           {selText ? (
-            <>
-              <h3>{selText.kind === 'input' ? 'Text nhập' : 'Text cố định'}</h3>
+            <SettingsPanel
+              title={selText.kind === 'input' ? '✏️ ' + (selText.label || 'Text nhập') : '🔤 ' + (selText.text || 'Text cố định')}
+              onClose={() => setSelected(null)}
+            >
               <TextPropsPanel
                 el={selText}
                 canvasWidth={tpl.width}
@@ -495,119 +487,125 @@ export default function TemplateEditorPage() {
                   setSelected(null);
                 }}
               />
-            </>
+            </SettingsPanel>
           ) : selected === 'slot' ? (
-            <>
-              <h3>Vùng đặt ảnh sản phẩm</h3>
-              <div className="panel">
-                <p className="hint">Kéo và kéo góc để chỉnh vị trí, kích thước vùng ảnh sẽ được chèn vào.</p>
-                <NumberRow rect={slot} onChange={(p) => updateSlot(p, 'slot-num')} />
-                <label className="field">
-                  <span>Bo góc: {slot.radius}px</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={Math.round(Math.min(slot.width, slot.height) / 2)}
-                    value={slot.radius}
-                    onChange={(e) => updateSlot({ radius: Number(e.target.value) }, 'slot-radius')}
-                  />
-                </label>
-                <div className="row wrap">
-                  <button className="btn ghost sm" onClick={() => updateSlot({ x: 0, y: 0, width: tpl.width, height: tpl.height })}>
-                    ⛶ Toàn khung
-                  </button>
-                  <button className="btn ghost sm" onClick={() => updateSlot({ x: Math.round((tpl.width - slot.width) / 2) })}>
-                    ↔ Căn giữa ngang
-                  </button>
-                  <button className="btn ghost sm" onClick={() => sampleInput.current?.click()}>
-                    🧪 {sampleImg ? 'Đổi ảnh thử' : 'Xem thử với 1 ảnh'}
-                  </button>
-                  {sampleImg && (
-                    <button className="btn ghost sm" onClick={() => setSampleImg(null)}>
-                      Bỏ ảnh thử
-                    </button>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : selected === 'frame' && hasFrame ? (
-            <>
-              <h3>Ảnh khung</h3>
-              <div className="panel">
-                <NumberRow rect={tpl.frame!} onChange={(p) => updateFrame(p, 'frame-num')} />
-                <div className="row wrap">
-                  <button
-                    className="btn ghost sm"
-                    onClick={() => updateFrame(containRect(frameImg!.naturalWidth, frameImg!.naturalHeight, tpl.width, tpl.height))}
-                  >
-                    ⛶ Vừa canvas
-                  </button>
-                  <button className="btn ghost sm" onClick={() => updateFrame({ x: 0, y: 0, width: tpl.width, height: tpl.height })}>
-                    ⤢ Kéo giãn toàn canvas
-                  </button>
-                  <button className="btn ghost sm" onClick={() => frameInput.current?.click()}>
-                    🔁 Đổi ảnh khung
-                  </button>
-                  <button
-                    className="btn danger sm"
-                    onClick={() => {
-                      history.set((d) => (d ? { ...d, frameRemoved: true } : d));
-                      setSelected(null);
-                    }}
-                  >
-                    🗑 Bỏ khung
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <h3>Cài đặt khung</h3>
-              <div className="panel">
-                <p className="hint">Chạm vào phần tử trên ảnh (hoặc các nút bên dưới ảnh) để chỉnh sửa. Trên máy tính: dùng phím mũi tên để dịch chuyển phần tử đang chọn (giữ Shift: 10px).</p>
-                <label className="field">
-                  <span>Kích thước ảnh xuất</span>
-                  <select
-                    value={presetValue ? `${presetValue.w}x${presetValue.h}` : 'custom'}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === 'frame' && frameImg) changeCanvasSize(frameImg.naturalWidth, frameImg.naturalHeight);
-                      else if (v !== 'custom') {
-                        const [w, h] = v.split('x').map(Number);
-                        changeCanvasSize(w, h);
-                      }
-                    }}
-                  >
-                    <option value="custom">
-                      {tpl.width}×{tpl.height}
-                      {frameImg && tpl.width === frameImg.naturalWidth && tpl.height === frameImg.naturalHeight ? ' (theo khung)' : ''}
-                    </option>
-                    {frameImg && <option value="frame">Theo kích thước ảnh khung</option>}
-                    {SIZE_PRESETS.map((p) => (
-                      <option key={p.label} value={`${p.w}x${p.h}`}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="row">
-                  <label className="field color">
-                    <span>Màu nền</span>
-                    <input type="color" value={tpl.background} onChange={(e) => update({ background: e.target.value }, 'bg')} />
-                  </label>
-                  <label className="check grow">
-                    <input type="checkbox" checked={tpl.photoOnTop} onChange={(e) => update({ photoOnTop: e.target.checked })} />
-                    Ảnh sản phẩm nằm đè lên khung
-                  </label>
-                </div>
-                {!hasFrame && (
-                  <button className="btn" onClick={() => frameInput.current?.click()}>
-                    🖼️ Thêm ảnh khung
+            <SettingsPanel title="📷 Vùng đặt ảnh sản phẩm" onClose={() => setSelected(null)}>
+              <p className="hint">Kéo và kéo góc để chỉnh vị trí, kích thước vùng ảnh sẽ được chèn vào.</p>
+              <NumberRow rect={slot} onChange={(p) => updateSlot(p, 'slot-num')} />
+              <label className="field">
+                <span>Bo góc: {slot.radius}px</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.round(Math.min(slot.width, slot.height) / 2)}
+                  value={slot.radius}
+                  onChange={(e) => updateSlot({ radius: Number(e.target.value) }, 'slot-radius')}
+                />
+              </label>
+              <div className="row wrap">
+                <button className="btn ghost sm" onClick={() => updateSlot({ x: 0, y: 0, width: tpl.width, height: tpl.height })}>
+                  ⛶ Toàn khung
+                </button>
+                <button className="btn ghost sm" onClick={() => updateSlot({ x: Math.round((tpl.width - slot.width) / 2) })}>
+                  ↔ Căn giữa ngang
+                </button>
+                <button className="btn ghost sm" onClick={() => sampleInput.current?.click()}>
+                  🧪 {sampleImg ? 'Đổi ảnh thử' : 'Xem thử với 1 ảnh'}
+                </button>
+                {sampleImg && (
+                  <button className="btn ghost sm" onClick={() => setSampleImg(null)}>
+                    Bỏ ảnh thử
                   </button>
                 )}
               </div>
-            </>
+            </SettingsPanel>
+          ) : selected === 'frame' && hasFrame ? (
+            <SettingsPanel title="🖼️ Ảnh khung" onClose={() => setSelected(null)}>
+              <NumberRow rect={tpl.frame!} onChange={(p) => updateFrame(p, 'frame-num')} />
+              <div className="row wrap">
+                <button
+                  className="btn ghost sm"
+                  onClick={() => updateFrame(containRect(frameImg!.naturalWidth, frameImg!.naturalHeight, tpl.width, tpl.height))}
+                >
+                  ⛶ Vừa canvas
+                </button>
+                <button className="btn ghost sm" onClick={() => updateFrame({ x: 0, y: 0, width: tpl.width, height: tpl.height })}>
+                  ⤢ Kéo giãn toàn canvas
+                </button>
+                <button className="btn ghost sm" onClick={() => frameInput.current?.click()}>
+                  🔁 Đổi ảnh khung
+                </button>
+                <button
+                  className="btn danger sm"
+                  onClick={() => {
+                    history.set((d) => (d ? { ...d, frameRemoved: true } : d));
+                    setSelected(null);
+                  }}
+                >
+                  🗑 Bỏ khung
+                </button>
+              </div>
+            </SettingsPanel>
+          ) : (
+            <p className="hint">
+              Chạm vào phần tử trên ảnh (hoặc các nút phía trên) để hiện phần chỉnh sửa ngay tại đây. Trên máy tính: phím
+              mũi tên dịch chuyển phần tử đang chọn (giữ Shift: 10px).
+            </p>
           )}
+          <div className="row wrap">
+            <button className="btn" onClick={() => addText('fixed')}>
+              ＋ Text cố định
+            </button>
+            <button className="btn" onClick={() => addText('input')}>
+              ＋ Text nhập (input)
+            </button>
+          </div>
+        </div>
+
+        <div className="side-col">
+          <h3>Cài đặt khung</h3>
+          <div className="panel">
+            <label className="field">
+              <span>Kích thước ảnh xuất</span>
+              <select
+                value={presetValue ? `${presetValue.w}x${presetValue.h}` : 'custom'}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === 'frame' && frameImg) changeCanvasSize(frameImg.naturalWidth, frameImg.naturalHeight);
+                  else if (v !== 'custom') {
+                    const [w, h] = v.split('x').map(Number);
+                    changeCanvasSize(w, h);
+                  }
+                }}
+              >
+                <option value="custom">
+                  {tpl.width}×{tpl.height}
+                  {frameImg && tpl.width === frameImg.naturalWidth && tpl.height === frameImg.naturalHeight ? ' (theo khung)' : ''}
+                </option>
+                {frameImg && <option value="frame">Theo kích thước ảnh khung</option>}
+                {SIZE_PRESETS.map((p) => (
+                  <option key={p.label} value={`${p.w}x${p.h}`}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="row">
+              <label className="field color">
+                <span>Màu nền</span>
+                <input type="color" value={tpl.background} onChange={(e) => update({ background: e.target.value }, 'bg')} />
+              </label>
+              <label className="check grow">
+                <input type="checkbox" checked={tpl.photoOnTop} onChange={(e) => update({ photoOnTop: e.target.checked })} />
+                Ảnh sản phẩm nằm đè lên khung
+              </label>
+            </div>
+            {!hasFrame && (
+              <button className="btn" onClick={() => frameInput.current?.click()}>
+                🖼️ Thêm ảnh khung
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

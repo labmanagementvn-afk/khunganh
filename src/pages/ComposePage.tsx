@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Group, Image as KImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
 import { Link, useParams } from 'react-router-dom';
 import { ResultModal } from '../components/ResultModal';
+import { SettingsPanel } from '../components/SettingsPanel';
 import { TextNode, createTextElement } from '../components/TextNode';
 import { TextPropsPanel } from '../components/TextPropsPanel';
 import { UndoRedoButtons } from '../components/UndoRedoButtons';
@@ -171,6 +172,7 @@ export default function ComposePage() {
         rotation: 0,
         scale: fitScale(img, 0, slot.width, slot.height, 'cover'),
       });
+      setSelected('photo');
     } catch (e) {
       setError((e as Error).message);
     }
@@ -478,13 +480,8 @@ export default function ComposePage() {
               </button>
             ))}
           </div>
-          <p className="hint">
-            Chạm vào chữ để chỉnh vị trí, màu, cỡ chữ… cho ảnh này. Trên máy tính: phím mũi tên dịch chuyển phần tử đang
-            chọn (giữ Shift: 10px).
-          </p>
-
-          {photo && (
-            <div className="panel">
+          {selected === 'photo' && photo ? (
+            <SettingsPanel title="📷 Ảnh sản phẩm" onClose={() => setSelected(null)}>
               <label className="field">
                 <span>Thu phóng ảnh (hoặc chụm/mở 2 ngón tay, con lăn chuột)</span>
                 <input
@@ -526,37 +523,12 @@ export default function ComposePage() {
                 <button className="btn ghost sm" onClick={() => fileInput.current?.click()}>🔁 Đổi ảnh</button>
               </div>
               <p className="hint">Kéo ảnh để di chuyển. Dùng 2 ngón tay để vừa phóng to/thu nhỏ vừa xoay ảnh.</p>
-            </div>
-          )}
-        </div>
-
-        <div className="side-col">
-          {!photo && (
-            <button className="btn primary lg block" onClick={() => fileInput.current?.click()}>
-              📷 Chọn ảnh sản phẩm
-            </button>
-          )}
-
-          {inputLabels.length > 0 && (
-            <div className="panel">
-              <h3>Thông tin</h3>
-              {inputLabels.map((label) => (
-                <label key={label} className="field">
-                  <span>{label}</span>
-                  <input
-                    value={values[label] ?? ''}
-                    placeholder={texts.find((t) => t.kind === 'input' && labelOf(t) === label)?.text || label}
-                    onChange={(e) => setValues((v) => ({ ...v, [label]: e.target.value }), 'value:' + label)}
-                    autoCapitalize="characters"
-                  />
-                </label>
-              ))}
-            </div>
-          )}
-
-          {selText && (
-            <div className="panel">
-              <h3>{selText.kind === 'input' ? '✏️ ' + labelOf(selText) : '🔤 Text của khung'}</h3>
+            </SettingsPanel>
+          ) : selText ? (
+            <SettingsPanel
+              title={selText.kind === 'input' ? '✏️ ' + labelOf(selText) : '🔤 ' + (selText.text || 'Chữ của khung')}
+              onClose={() => setSelected(null)}
+            >
               <TextPropsPanel
                 el={selText}
                 canvasWidth={tpl.width}
@@ -582,6 +554,51 @@ export default function ComposePage() {
                   setSelected(null);
                 }}
               />
+            </SettingsPanel>
+          ) : selExtra ? (
+            <SettingsPanel title={'🔤 ' + (selExtra.text || 'Chữ thêm')} onClose={() => setSelected(null)}>
+              <TextPropsPanel
+                el={selExtra}
+                canvasWidth={tpl.width}
+                allowKind={false}
+                onChange={(p) =>
+                  setExtras((xs) => xs.map((x) => (x.id === selExtra.id ? { ...x, ...p } : x)), 'text:' + selExtra.id)
+                }
+                onDelete={() => {
+                  setExtras((xs) => xs.filter((x) => x.id !== selExtra.id));
+                  setSelected(null);
+                }}
+              />
+            </SettingsPanel>
+          ) : (
+            <p className="hint">
+              Chạm vào ảnh hoặc chữ (hoặc các nút phía trên) để hiện phần chỉnh sửa ngay tại đây. Trên máy tính: phím mũi
+              tên dịch chuyển phần tử đang chọn (giữ Shift: 10px).
+            </p>
+          )}
+        </div>
+
+        <div className="side-col">
+          {!photo && (
+            <button className="btn primary lg block" onClick={() => fileInput.current?.click()}>
+              📷 Chọn ảnh sản phẩm
+            </button>
+          )}
+
+          {inputLabels.length > 0 && (
+            <div className="panel">
+              <h3>Thông tin</h3>
+              {inputLabels.map((label) => (
+                <label key={label} className="field">
+                  <span>{label}</span>
+                  <input
+                    value={values[label] ?? ''}
+                    placeholder={texts.find((t) => t.kind === 'input' && labelOf(t) === label)?.text || label}
+                    onChange={(e) => setValues((v) => ({ ...v, [label]: e.target.value }), 'value:' + label)}
+                    autoCapitalize="characters"
+                  />
+                </label>
+              ))}
             </div>
           )}
 
@@ -617,20 +634,6 @@ export default function ComposePage() {
                 </select>
               </label>
             </div>
-            {selExtra && (
-              <TextPropsPanel
-                el={selExtra}
-                canvasWidth={tpl.width}
-                allowKind={false}
-                onChange={(p) =>
-                  setExtras((xs) => xs.map((x) => (x.id === selExtra.id ? { ...x, ...p } : x)), 'text:' + selExtra.id)
-                }
-                onDelete={() => {
-                  setExtras((xs) => xs.filter((x) => x.id !== selExtra.id));
-                  setSelected(null);
-                }}
-              />
-            )}
           </div>
 
           <button className="btn primary lg block" disabled={!photo || busy} onClick={exportImage}>
