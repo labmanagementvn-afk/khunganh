@@ -39,8 +39,8 @@ function Shell({ children }: { children: ReactNode }) {
         </NavLink>
         <nav className="top-nav">
           <NavLink to="/" end>Khung mẫu</NavLink>
-          <NavLink to="/feed">Bảng tin</NavLink>
           <NavLink to="/collage">Ghép ảnh</NavLink>
+          <NavLink to="/feed">Bảng tin</NavLink>
         </nav>
         <div className="header-account">{account}</div>
       </header>
@@ -50,13 +50,13 @@ function Shell({ children }: { children: ReactNode }) {
           <Icon name="frame" size={22} />
           <span>Khung mẫu</span>
         </NavLink>
-        <NavLink to="/feed">
-          <Icon name="feed" size={22} />
-          <span>Bảng tin</span>
-        </NavLink>
         <NavLink to="/collage">
           <Icon name="grid" size={22} />
           <span>Ghép ảnh</span>
+        </NavLink>
+        <NavLink to="/feed">
+          <Icon name="feed" size={22} />
+          <span>Bảng tin</span>
         </NavLink>
         <NavLink to="/account">
           <Icon name="user" size={22} />
