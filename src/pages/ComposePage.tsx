@@ -2,11 +2,13 @@ import Konva from 'konva';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Group, Image as KImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { AdjustSliders, FilterPicker } from '../components/PhotoAdjustPanels';
 import { ResultModal } from '../components/ResultModal';
 import { SettingsPanel } from '../components/SettingsPanel';
 import { TextNode, createTextElement } from '../components/TextNode';
 import { TextPropsPanel } from '../components/TextPropsPanel';
 import { UndoRedoButtons } from '../components/UndoRedoButtons';
+import { useAdjustedPhoto } from '../components/useAdjustedPhoto';
 import { useArrowNudge } from '../components/useArrowNudge';
 import { useHistory, useUndoRedoKeys } from '../components/useHistory';
 import { useFitScale } from '../components/useFitScale';
@@ -15,6 +17,7 @@ import { useUser } from '../lib/auth';
 import { useFontsReady } from '../lib/fonts';
 import { slotClip } from '../lib/geometry';
 import { newId } from '../lib/id';
+import { DEFAULT_ADJUST, isIdentity, renderAdjusted, type PhotoAdjust } from '../lib/photoFilters';
 import { blobToImage, canvasToBlob, makeThumbnail, prepareImageFile } from '../lib/image';
 import { safeFileName } from '../lib/share';
 import type { Template, TextElement } from '../types';
@@ -29,6 +32,8 @@ interface PhotoState {
   cy: number;
   scale: number;
   rotation: number;
+  /** Bộ lọc & chỉnh màu */
+  adjust: PhotoAdjust;
 }
 
 /**
@@ -79,6 +84,7 @@ export default function ComposePage() {
   const [frameImg, setFrameImg] = useState<HTMLImageElement | null>(null);
   const history = useHistory<ComposeDoc>({ photo: null, values: {}, texts: [], extras: [] });
   const { photo, values, texts, extras } = history.present;
+  const photoDisplay = useAdjustedPhoto(photo?.img ?? null, photo?.adjust ?? null);
   /** Cập nhật một phần của ComposeDoc; mergeKey gộp các thay đổi liên tục (thu phóng, gõ chữ…) thành 1 bước hoàn tác */
   const field =
     <K extends keyof ComposeDoc>(key: K) =>
@@ -93,6 +99,7 @@ export default function ComposePage() {
   const setExtras = field('extras');
   const [savingStyle, setSavingStyle] = useState<'' | 'saving' | 'saved'>('');
   const [selected, setSelected] = useState<string | null>(null);
+  const [photoTab, setPhotoTab] = useState<'position' | 'filter' | 'adjust'>('position');
   const [format, setFormat] = useState<'image/jpeg' | 'image/png'>('image/jpeg');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -179,6 +186,7 @@ export default function ComposePage() {
         cy: slot.y + slot.height / 2,
         rotation: 0,
         scale: fitScale(img, 0, slot.width, slot.height, 'cover'),
+        adjust: DEFAULT_ADJUST,
       });
       setSelected('photo');
     } catch (e) {
@@ -210,6 +218,9 @@ export default function ComposePage() {
         : p,
     );
   }
+
+  const setAdjust = (patch: Partial<PhotoAdjust>, mergeKey?: string) =>
+    setPhoto((p) => (p ? { ...p, adjust: { ...p.adjust, ...patch } } : p), mergeKey);
 
   /** Xoay ảnh quanh tâm của nó (thanh trượt) */
   function setRotation(deg: number) {
@@ -290,8 +301,17 @@ export default function ComposePage() {
       const stage = stageRef.current!;
       stage.findOne('#slot-hint')?.hide();
       stage.find('.placeholder').forEach((n) => n.hide());
+      // Ảnh xem trước đã lọc ở độ phân giải thấp: xử lý lại ảnh gốc cho ảnh xuất
+      const photoNode = stage.findOne('#photo') as Konva.Image | undefined;
+      const previewImage = photoNode?.image();
+      if (photoNode && !isIdentity(photo.adjust)) {
+        // Chỉ cần xử lý ở đúng kích thước ảnh hiện ra trong ảnh xuất (nhanh hơn nhiều so với ảnh gốc)
+        const shownSide = Math.ceil(Math.max(photo.img.naturalWidth, photo.img.naturalHeight) * photo.scale * 1.05);
+        photoNode.image(renderAdjusted(photo.img, photo.adjust, shownSide));
+      }
       stage.draw();
       const canvas = stage.toCanvas({ pixelRatio: tpl.width / stage.width() });
+      if (photoNode && previewImage) photoNode.image(previewImage);
       stage.findOne('#slot-hint')?.show();
       stage.find('.placeholder').forEach((n) => n.show());
       const blob = await canvasToBlob(canvas, format, format === 'image/jpeg' ? 0.92 : undefined);
@@ -344,7 +364,9 @@ export default function ComposePage() {
       {photo ? (
         <KImage
           id="photo"
-          image={photo.img}
+          image={photoDisplay ?? photo.img}
+          width={photo.img.naturalWidth}
+          height={photo.img.naturalHeight}
           x={photo.cx}
           y={photo.cy}
           offsetX={photo.img.naturalWidth / 2}
@@ -503,47 +525,68 @@ export default function ComposePage() {
           </div>
           {selected === 'photo' && photo ? (
             <SettingsPanel title="📷 Ảnh sản phẩm" onClose={() => setSelected(null)}>
-              <label className="field">
-                <span>Thu phóng ảnh (hoặc chụm/mở 2 ngón tay, con lăn chuột)</span>
-                <input
-                  type="range"
-                  min={Math.log(minZoom)}
-                  max={Math.log(maxZoom)}
-                  step={0.001}
-                  value={Math.log(photo.scale)}
-                  onChange={(e) => setZoom(Math.exp(Number(e.target.value)))}
-                />
-              </label>
-              <label className="field">
-                <span>
-                  Xoay ảnh: {Math.round(photo.rotation)}° (hoặc xoay 2 ngón tay)
-                </span>
-                <div className="row">
-                  <input
-                    className="grow"
-                    type="range"
-                    min={-180}
-                    max={180}
-                    step={1}
-                    value={Math.round(photo.rotation)}
-                    onChange={(e) => setRotation(Number(e.target.value))}
-                  />
-                  <button
-                    className="btn ghost sm"
-                    disabled={photo.rotation === 0}
-                    onClick={() => setPhoto((p) => (p ? { ...p, rotation: 0 } : p))}
-                  >
-                    0°
+              <div className="seg tabs">
+                {(
+                  [
+                    ['position', 'Vị trí'],
+                    ['filter', 'Bộ lọc'],
+                    ['adjust', 'Chỉnh sửa'],
+                  ] as const
+                ).map(([k, label]) => (
+                  <button key={k} className={photoTab === k ? 'on' : ''} onClick={() => setPhotoTab(k)}>
+                    {label}
                   </button>
-                </div>
-              </label>
-              <div className="row wrap">
-                <button className="btn ghost sm" onClick={() => fit('cover')}>⛶ Lấp đầy</button>
-                <button className="btn ghost sm" onClick={() => fit('contain')}>▣ Hiện toàn bộ</button>
-                <button className="btn ghost sm" onClick={rotate}>⟳ Xoay 90°</button>
-                <button className="btn ghost sm" onClick={() => fileInput.current?.click()}>🔁 Đổi ảnh</button>
+                ))}
               </div>
-              <p className="hint">Kéo ảnh để di chuyển. Dùng 2 ngón tay để vừa phóng to/thu nhỏ vừa xoay ảnh.</p>
+              {photoTab === 'filter' ? (
+                <FilterPicker img={photo.img} adjust={photo.adjust} onChange={setAdjust} />
+              ) : photoTab === 'adjust' ? (
+                <AdjustSliders img={photo.img} adjust={photo.adjust} onChange={setAdjust} />
+              ) : (
+                <>
+                  <label className="field">
+                    <span>Thu phóng ảnh (hoặc chụm/mở 2 ngón tay, con lăn chuột)</span>
+                    <input
+                      type="range"
+                      min={Math.log(minZoom)}
+                      max={Math.log(maxZoom)}
+                      step={0.001}
+                      value={Math.log(photo.scale)}
+                      onChange={(e) => setZoom(Math.exp(Number(e.target.value)))}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>
+                      Xoay ảnh: {Math.round(photo.rotation)}° (hoặc xoay 2 ngón tay)
+                    </span>
+                    <div className="row">
+                      <input
+                        className="grow"
+                        type="range"
+                        min={-180}
+                        max={180}
+                        step={1}
+                        value={Math.round(photo.rotation)}
+                        onChange={(e) => setRotation(Number(e.target.value))}
+                      />
+                      <button
+                        className="btn ghost sm"
+                        disabled={photo.rotation === 0}
+                        onClick={() => setPhoto((p) => (p ? { ...p, rotation: 0 } : p))}
+                      >
+                        0°
+                      </button>
+                    </div>
+                  </label>
+                  <div className="row wrap">
+                    <button className="btn ghost sm" onClick={() => fit('cover')}>⛶ Lấp đầy</button>
+                    <button className="btn ghost sm" onClick={() => fit('contain')}>▣ Hiện toàn bộ</button>
+                    <button className="btn ghost sm" onClick={rotate}>⟳ Xoay 90°</button>
+                    <button className="btn ghost sm" onClick={() => fileInput.current?.click()}>🔁 Đổi ảnh</button>
+                  </div>
+                  <p className="hint">Kéo ảnh để di chuyển. Dùng 2 ngón tay để vừa phóng to/thu nhỏ vừa xoay ảnh.</p>
+                </>
+              )}
             </SettingsPanel>
           ) : selText ? (
             <SettingsPanel
