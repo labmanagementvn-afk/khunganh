@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Icon } from './Icon';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../lib/auth';
 import { PRESETS, PRESET_CATEGORIES, type Preset } from '../presets/presets';
@@ -62,9 +61,9 @@ export function PresetGallery() {
   }
 
   return (
-    <section className="presets">
-      <div className="toolbar">
-        <h2 className="grow"><Icon name="wand" /> Mẫu có sẵn</h2>
+    <section className="section presets" id="presets">
+      <div className="section-head">
+        <h2>Mẫu có sẵn</h2>
       </div>
       <p className="hint">Chọn một mẫu để tạo khung của riêng bạn – sau đó có thể đổi chữ, màu, vị trí tuỳ ý.</p>
       <div className="chips">
