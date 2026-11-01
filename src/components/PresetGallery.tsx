@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { backend } from '../lib/backend';
-import { useUser } from '../lib/auth';
+import { useSession } from '../lib/auth';
 import { PRESETS, PRESET_CATEGORIES, type Preset } from '../presets/presets';
 import { createTemplateFromPreset, presetPreview } from '../presets/render';
 
@@ -37,7 +36,7 @@ const BIG_PHOTO = '🖼️ Ảnh lớn';
 
 /** Thư viện khung mẫu có sẵn: chọn một mẫu sẽ tạo bản sao vào "Khung mẫu của tôi" */
 export function PresetGallery() {
-  const user = useUser();
+  const { uid, store } = useSession();
   const navigate = useNavigate();
   const [category, setCategory] = useState<string>('Tất cả');
   const [busyId, setBusyId] = useState('');
@@ -53,7 +52,7 @@ export function PresetGallery() {
     setBusyId(preset.id);
     setError('');
     try {
-      const tpl = await createTemplateFromPreset(backend, user.uid, preset);
+      const tpl = await createTemplateFromPreset(store, uid, preset);
       navigate(`/compose/${tpl.id}?new=1`);
     } catch (e) {
       setError('Không tạo được khung từ mẫu: ' + (e as Error).message);

@@ -12,9 +12,11 @@ import {
   collection,
   deleteDoc,
   doc,
+  getCountFromServer,
   getDoc,
   getDocs,
   initializeFirestore,
+  limit,
   orderBy,
   persistentLocalCache,
   persistentMultipleTabManager,
@@ -22,6 +24,7 @@ import {
   setDoc,
 } from 'firebase/firestore';
 import type { HistoryEntry, Template } from '../../types';
+import { HISTORY_LIMIT } from '../history';
 import { newId } from '../id';
 import type { Backend } from './types';
 
@@ -46,7 +49,7 @@ export function createFirebaseBackend(config: Record<string, string>): Backend {
   // Firestore không chấp nhận giá trị undefined
   const clean = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
-  return {
+  const api: Backend = {
     mode: 'firebase',
     onAuthChange(cb) {
       return onAuthStateChanged(auth, (u) =>
@@ -99,11 +102,23 @@ export function createFirebaseBackend(config: Record<string, string>): Backend {
     },
 
     async listHistory(uid) {
-      const snap = await getDocs(query(userCol(uid, 'history'), orderBy('createdAt', 'desc')));
+      const snap = await getDocs(query(userCol(uid, 'history'), orderBy('createdAt', 'desc'), limit(HISTORY_LIMIT)));
       return snap.docs.map((d) => ({ ...(d.data() as HistoryEntry), id: d.id }));
     },
     async addHistory(uid, entry) {
       await setDoc(userDoc(uid, 'history', entry.id), clean(entry));
+      // Chỉ giữ HISTORY_LIMIT mục gần nhất: đếm (rẻ) rồi xoá các mục cũ nhất
+      const col = userCol(uid, 'history');
+      const total = (await getCountFromServer(col)).data().count;
+      if (total <= HISTORY_LIMIT) return;
+      const old = await getDocs(query(col, orderBy('createdAt', 'asc'), limit(total - HISTORY_LIMIT)));
+      await Promise.all(
+        old.docs.map(async (d) => {
+          await deleteDoc(d.ref);
+          const blobId = (d.data() as HistoryEntry).resultBlobId;
+          if (blobId) await api.deleteBlob(uid, blobId).catch(() => {});
+        }),
+      );
     },
     async deleteHistory(uid, id) {
       await deleteDoc(userDoc(uid, 'history', id));
@@ -159,4 +174,5 @@ export function createFirebaseBackend(config: Record<string, string>): Backend {
       blobCache.delete(id);
     },
   };
+  return api;
 }

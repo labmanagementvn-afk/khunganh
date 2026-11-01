@@ -9,8 +9,7 @@ import { UndoRedoButtons } from '../components/UndoRedoButtons';
 import { useArrowNudge } from '../components/useArrowNudge';
 import { useHistory, useUndoRedoKeys } from '../components/useHistory';
 import { useFitScale } from '../components/useFitScale';
-import { backend } from '../lib/backend';
-import { useUser } from '../lib/auth';
+import { useSession } from '../lib/auth';
 import { useFontsReady } from '../lib/fonts';
 import { newId } from '../lib/id';
 import { slotClip } from '../lib/geometry';
@@ -71,7 +70,7 @@ const newDoc = (tpl: Template): EditorDoc => ({ tpl, frameImg: null, newFrameBlo
 
 export default function TemplateEditorPage() {
   const { id } = useParams();
-  const user = useUser();
+  const { uid, store } = useSession();
   const navigate = useNavigate();
   const isNew = !id;
 
@@ -105,12 +104,12 @@ export default function TemplateEditorPage() {
     let alive = true;
     (async () => {
       try {
-        const t = await backend.getTemplate(user.uid, id!);
+        const t = await store.getTemplate(uid, id!);
         if (!t) throw new Error('Không tìm thấy khung mẫu');
         if (!alive) return;
         history.reset(newDoc(t));
         if (t.frame) {
-          const img = await blobToImage(await backend.getBlob(user.uid, t.frame.blobId));
+          const img = await blobToImage(await store.getBlob(uid, t.frame.blobId));
           if (alive) history.reset((d) => (d ? { ...d, frameImg: img } : d));
         }
       } catch (e) {
@@ -120,7 +119,7 @@ export default function TemplateEditorPage() {
     return () => {
       alive = false;
     };
-  }, [id, isNew, user.uid]);
+  }, [id, isNew, uid]);
 
   // Gắn transformer vào phần tử đang chọn
   useEffect(() => {
@@ -251,11 +250,11 @@ export default function TemplateEditorPage() {
       let frame = tpl.frame;
       const oldBlobId = !isNew && (newFrameBlob || frameRemoved) ? tpl.frame?.blobId || null : null;
       if (frameRemoved) frame = null;
-      if (newFrameBlob && frame) frame = { ...frame, blobId: await backend.putBlob(user.uid, newFrameBlob) };
+      if (newFrameBlob && frame) frame = { ...frame, blobId: await store.putBlob(uid, newFrameBlob) };
 
       const toSave: Template = { ...tpl, name: tpl.name.trim(), frame, thumbnail, updatedAt: Date.now() };
-      await backend.saveTemplate(user.uid, toSave);
-      if (oldBlobId && oldBlobId !== frame?.blobId) backend.deleteBlob(user.uid, oldBlobId).catch(() => {});
+      await store.saveTemplate(uid, toSave);
+      if (oldBlobId && oldBlobId !== frame?.blobId) store.deleteBlob(uid, oldBlobId).catch(() => {});
       navigate('/', { replace: true });
     } catch (e) {
       setError('Lưu thất bại: ' + (e as Error).message);

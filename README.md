@@ -80,15 +80,24 @@ hoặc chạy tay ở tab **Actions → Deploy to Firebase → Run workflow**. C
 
 ### Lưu trữ ảnh
 
-Ảnh khung và ảnh kết quả được lưu trực tiếp trong Firestore (chia thành các khối < 1 MB) nên **không cần
-Cloud Storage / gói Blaze** và không gặp lỗi CORS khi vẽ lên canvas. Gói miễn phí có 1 GiB dữ liệu – đủ cho
-vài nghìn ảnh; có thể xoá bớt lịch sử cũ trong trang Lịch sử.
+Ảnh khung được lưu trực tiếp trong Firestore (chia thành các khối < 1 MB) nên **không cần
+Cloud Storage / gói Blaze** và không gặp lỗi CORS khi vẽ lên canvas.
+
+Để tiết kiệm dung lượng, **lịch sử chỉ giữ 10 ảnh gần nhất** của mỗi tài khoản và chỉ lưu ảnh xem lại cỡ vừa
+(≤720px, ~100 KB) cùng thông tin đã nhập – không lưu file ảnh gốc (người dùng tải ảnh về máy khi tạo).
+Mỗi tài khoản vì vậy chỉ chiếm khoảng 1 MB cho lịch sử, cộng dung lượng các ảnh khung.
+
+### Dùng không cần đăng nhập
+
+Khách chưa đăng nhập vẫn tạo, chỉnh và tải ảnh bình thường (kể cả hàng loạt). Khung tự tạo được lưu trong
+trình duyệt của máy đó, và ảnh tạo ra **không** được lưu lịch sử. Khách không dùng Firestore nên không tốn
+hạn mức của project.
 
 Cấu trúc dữ liệu (chỉ chủ tài khoản được đọc/ghi – xem `firestore.rules`):
 
 ```
 users/{uid}/templates/{id}        khung mẫu (vị trí khung, vùng ảnh, các text, ảnh thu nhỏ)
-users/{uid}/history/{id}          lịch sử ảnh đã xuất
+users/{uid}/history/{id}          lịch sử: 10 ảnh gần nhất (ảnh xem lại + thông tin đã nhập)
 users/{uid}/blobs/{id}/chunks/{n} dữ liệu ảnh nhị phân
 ```
 

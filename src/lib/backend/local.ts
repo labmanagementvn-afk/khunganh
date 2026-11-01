@@ -1,4 +1,5 @@
 import type { AppUser, HistoryEntry, Template } from '../../types';
+import { HISTORY_LIMIT } from '../history';
 import { newId } from '../id';
 import type { Backend } from './types';
 
@@ -95,10 +96,15 @@ export const localBackend: Backend = {
 
   async listHistory() {
     const all = await getAll<HistoryEntry>('history');
-    return all.sort((a, b) => b.createdAt - a.createdAt);
+    return all.sort((a, b) => b.createdAt - a.createdAt).slice(0, HISTORY_LIMIT);
   },
   async addHistory(_uid, entry) {
     await putOne('history', entry.id, entry);
+    const all = (await getAll<HistoryEntry>('history')).sort((a, b) => b.createdAt - a.createdAt);
+    for (const old of all.slice(HISTORY_LIMIT)) {
+      await delOne('history', old.id);
+      if (old.resultBlobId) await delOne('blobs', old.resultBlobId);
+    }
   },
   async deleteHistory(_uid, id) {
     await delOne('history', id);

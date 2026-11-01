@@ -12,7 +12,6 @@ import TemplateEditorPage from './pages/TemplateEditorPage';
 function Shell({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="page center"><div className="spinner" /></div>;
-  if (!user) return <Navigate to="/login" replace />;
   return (
     <>
       <header className="header">
@@ -24,17 +23,23 @@ function Shell({ children }: { children: ReactNode }) {
           <NavLink to="/" end>Khung mẫu</NavLink>
           <NavLink to="/history">Lịch sử</NavLink>
         </nav>
-        <button
-          className="user"
-          title={`${user.displayName}\n${user.email}\nNhấn để đăng xuất`}
-          onClick={() => confirm('Đăng xuất?') && backend.signOut()}
-        >
-          {user.photoURL ? (
-            <img src={user.photoURL} alt="" referrerPolicy="no-referrer" />
-          ) : (
-            <span>{user.displayName.charAt(0).toUpperCase()}</span>
-          )}
-        </button>
+        {user ? (
+          <button
+            className="user"
+            title={`${user.displayName}\n${user.email}\nNhấn để đăng xuất`}
+            onClick={() => confirm('Đăng xuất?') && backend.signOut()}
+          >
+            {user.photoURL ? (
+              <img src={user.photoURL} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              <span>{user.displayName.charAt(0).toUpperCase()}</span>
+            )}
+          </button>
+        ) : (
+          <NavLink to="/login" className="btn primary sm">
+            Đăng nhập
+          </NavLink>
+        )}
       </header>
       <main>{children}</main>
     </>

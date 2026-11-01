@@ -1,29 +1,34 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ResultModal } from '../components/ResultModal';
-import { backend } from '../lib/backend';
-import { useUser } from '../lib/auth';
+import { useSession } from '../lib/auth';
+import { HISTORY_LIMIT } from '../lib/history';
 import { safeFileName } from '../lib/share';
 import type { HistoryEntry } from '../types';
 
 export default function HistoryPage() {
-  const user = useUser();
+  const { uid, store, guest } = useSession();
   const [items, setItems] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState('');
   const [open, setOpen] = useState<{ entry: HistoryEntry; blob: Blob } | null>(null);
   const [loadingId, setLoadingId] = useState('');
 
   useEffect(() => {
-    backend
-      .listHistory(user.uid)
+    if (guest) return;
+    store
+      .listHistory(uid)
       .then(setItems)
       .catch((e) => setError((e as Error).message));
-  }, [user.uid]);
+  }, [uid, store, guest]);
 
   async function view(entry: HistoryEntry) {
     setLoadingId(entry.id);
     try {
-      setOpen({ entry, blob: await backend.getBlob(user.uid, entry.resultBlobId) });
+      // Mục cũ có file ảnh gốc; mục mới chỉ có ảnh xem lại (data URL)
+      const blob = entry.resultBlobId
+        ? await store.getBlob(uid, entry.resultBlobId)
+        : await (await fetch(entry.thumbnail)).blob();
+      setOpen({ entry, blob });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -33,8 +38,8 @@ export default function HistoryPage() {
 
   async function remove(entry: HistoryEntry) {
     if (!confirm('Xoá ảnh này khỏi lịch sử?')) return;
-    await backend.deleteHistory(user.uid, entry.id);
-    backend.deleteBlob(user.uid, entry.resultBlobId).catch(() => {});
+    await store.deleteHistory(uid, entry.id);
+    if (entry.resultBlobId) store.deleteBlob(uid, entry.resultBlobId).catch(() => {});
     setItems((xs) => xs?.filter((x) => x.id !== entry.id) ?? null);
     setOpen(null);
   }
@@ -45,11 +50,27 @@ export default function HistoryPage() {
       .map(([k, v]) => `${k}: ${v}`)
       .join(' · ');
 
+  if (guest) {
+    return (
+      <div className="page narrow">
+        <h1>Lịch sử tạo ảnh</h1>
+        <div className="card empty">
+          <p className="muted">Bạn đang dùng không đăng nhập nên ảnh tạo ra không được lưu lịch sử.</p>
+          <p className="muted">Đăng nhập bằng Gmail để xem lại {HISTORY_LIMIT} ảnh gần nhất và dùng khung mẫu trên mọi thiết bị.</p>
+          <Link to="/login" className="btn primary lg">
+            Đăng nhập bằng Google
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <div className="toolbar">
         <h1 className="grow">Lịch sử tạo ảnh</h1>
       </div>
+      <p className="hint">Lưu {HISTORY_LIMIT} ảnh gần nhất (ảnh xem lại cỡ vừa). Ảnh gốc độ phân giải đầy đủ hãy tải về máy khi tạo.</p>
       {error && <p className="error">{error}</p>}
       {!items && !error && <div className="center"><div className="spinner" /></div>}
       {items && items.length === 0 && (

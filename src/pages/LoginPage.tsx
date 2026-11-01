@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { backend } from '../lib/backend';
 import { useAuth } from '../lib/auth';
 
@@ -48,6 +48,13 @@ export default function LoginPage() {
           </>
         )}
         {error && <p className="error">{error}</p>}
+        <Link to="/" className="btn ghost block">
+          Dùng ngay, không cần đăng nhập →
+        </Link>
+        <p className="hint">
+          Không đăng nhập vẫn tạo và tải ảnh bình thường, khung tự tạo lưu trên máy này, nhưng không lưu lịch sử và không dùng
+          được trên thiết bị khác.
+        </p>
       </div>
     </div>
   );

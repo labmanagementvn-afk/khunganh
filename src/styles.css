@@ -209,3 +209,5 @@ input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--primary)
 .result-thumb { width: 100%; display: block; background: #eceef5; }
 .batch-fields .seg button { white-space: nowrap; padding: 6px 10px; font-size: 0.82rem; }
 .batch-fields .row.wrap { gap: 6px; }
+.banner.info { background: var(--primary-soft); border-color: #c7d2fe; color: #3730a3; }
+.header .btn.sm { flex: none; }
