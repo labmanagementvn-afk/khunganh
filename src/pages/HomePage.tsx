@@ -1,10 +1,31 @@
 import { useEffect, useState } from 'react';
-import { Icon } from '../components/Icon';
 import { Link, useNavigate } from 'react-router-dom';
+import { Icon, type IconName } from '../components/Icon';
 import { PresetGallery } from '../components/PresetGallery';
 import { useSession } from '../lib/auth';
 import { COLLAGE_COUNTS, firstLayoutFor } from '../lib/collageLayouts';
 import type { Template } from '../types';
+
+function ActionTile({ icon, title, text, onClick, to }: { icon: IconName; title: string; text: string; onClick?: () => void; to?: string }) {
+  const body = (
+    <>
+      <span className="action-icon">
+        <Icon name={icon} size={22} />
+      </span>
+      <strong>{title}</strong>
+      <small>{text}</small>
+    </>
+  );
+  return to ? (
+    <Link to={to} className="action-tile">
+      {body}
+    </Link>
+  ) : (
+    <button className="action-tile" onClick={onClick}>
+      {body}
+    </button>
+  );
+}
 
 export default function HomePage() {
   const { uid, store, guest } = useSession();
@@ -17,7 +38,7 @@ export default function HomePage() {
       .listTemplates(uid)
       .then(setItems)
       .catch((e) => setError((e as Error).message));
-  }, [uid]);
+  }, [uid, store]);
 
   async function remove(t: Template) {
     if (!confirm(`Xoá khung "${t.name}"?`)) return;
@@ -26,77 +47,81 @@ export default function HomePage() {
     setItems((xs) => xs?.filter((x) => x.id !== t.id) ?? null);
   }
 
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
   return (
-    <div className="page">
-      <div className="toolbar">
-        <h1 className="grow">Khung mẫu của tôi</h1>
-        <Link to="/templates/new" className="btn primary">
-          <Icon name="plus" /> Tạo khung mới
-        </Link>
-      </div>
-      {guest && (
-        <div className="banner info">
-          <span>
-            Bạn đang dùng không đăng nhập: khung mẫu lưu trên máy này, ảnh tạo ra không lưu lịch sử. Đăng nhập Gmail để lưu lịch
-            sử và dùng khung trên mọi thiết bị.
-          </span>
-          <Link to="/login" className="btn sm">
-            Đăng nhập
-          </Link>
+    <div className="page home">
+      <section className="intro">
+        <h1>Ảnh sản phẩm đẹp trong vài giây</h1>
+        <p className="muted">Chọn khung, thêm ảnh và mã sản phẩm – xuất ảnh và lưu thẳng vào điện thoại.</p>
+        <div className="action-grid">
+          <ActionTile icon="frame" title="Dùng khung mẫu" text="20 mẫu cho mọi ngành hàng" onClick={() => scrollTo('presets')} />
+          <ActionTile icon="grid" title="Ghép ảnh" text="2–6 ảnh, nhiều bố cục" to="/collage" />
+          <ActionTile icon="plus" title="Tự tạo khung" text="Tải khung của riêng bạn" to="/templates/new" />
         </div>
+      </section>
+
+      {guest && (
+        <p className="notice">
+          <Icon name="user" size={16} />
+          <span>
+            Đang dùng không đăng nhập – ảnh không được lưu lịch sử. <Link to="/login">Đăng nhập</Link> để lưu và dùng trên mọi thiết bị.
+          </span>
+        </p>
       )}
       {error && <p className="error">{error}</p>}
-      {!items && !error && <div className="center"><div className="spinner" /></div>}
-      {items && items.length === 0 && (
-        <div className="card empty">
-          <h3>Chưa có khung mẫu nào</h3>
-          <p className="muted">
-            Chọn một mẫu có sẵn bên dưới, hoặc tự tạo khung: tải ảnh khung, đặt vùng ảnh sản phẩm, thêm chữ "Mã sản phẩm" và ô
-            nhập mã.
-          </p>
-          <Link to="/templates/new" className="btn lg">
-            <Icon name="plus" /> Tự tạo khung
+
+      {items && items.length > 0 && (
+        <section className="section">
+          <div className="section-head">
+            <h2>Khung của tôi</h2>
+            <Link to="/templates/new" className="btn ghost sm">
+              <Icon name="plus" /> Tạo mới
+            </Link>
+          </div>
+          <div className="hscroll">
+            {items.map((t) => (
+              <div key={t.id} className="tpl-card mine">
+                <button className="tpl-thumb" onClick={() => navigate(`/compose/${t.id}`)} title="Dùng khung này">
+                  {t.thumbnail ? <img src={t.thumbnail} alt={t.name} /> : <Icon name="image" size={28} />}
+                </button>
+                <div className="tpl-info">
+                  <strong className="ellipsis">{t.name}</strong>
+                  <small className="muted">
+                    {t.width}×{t.height} · {t.texts.filter((x) => x.kind === 'input').length} ô nhập
+                  </small>
+                </div>
+                <div className="tpl-actions">
+                  <Link className="btn primary sm grow" to={`/compose/${t.id}`}>
+                    Dùng
+                  </Link>
+                  <Link className="icon-btn" to={`/batch/${t.id}`} title="Tạo hàng loạt từ nhiều ảnh" aria-label="Tạo hàng loạt">
+                    <Icon name="layers" />
+                  </Link>
+                  <Link className="icon-btn" to={`/templates/${t.id}/edit`} title="Sửa khung" aria-label="Sửa khung">
+                    <Icon name="edit" />
+                  </Link>
+                  <button className="icon-btn" onClick={() => remove(t)} title="Xoá khung" aria-label="Xoá khung">
+                    <Icon name="trash" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="section">
+        <div className="section-head">
+          <h2>Ghép nhiều ảnh</h2>
+          <Link to="/collage" className="btn ghost sm">
+            Tất cả bố cục <Icon name="arrowRight" />
           </Link>
         </div>
-      )}
-      <div className="grid">
-        {items?.map((t) => (
-          <div key={t.id} className="tpl-card">
-            <button className="tpl-thumb" onClick={() => navigate(`/compose/${t.id}`)} title="Dùng khung này">
-              {t.thumbnail ? <img src={t.thumbnail} alt={t.name} /> : <span><Icon name="image" /> </span>}
-            </button>
-            <div className="tpl-info">
-              <strong className="ellipsis">{t.name}</strong>
-              <small className="muted">
-                {t.width}×{t.height} · {t.texts.filter((x) => x.kind === 'input').length} ô nhập
-              </small>
-            </div>
-            <div className="tpl-actions">
-              <Link className="btn primary sm grow" to={`/compose/${t.id}`}>
-                Dùng khung
-              </Link>
-              <Link className="btn ghost sm" to={`/batch/${t.id}`} title="Tạo hàng loạt từ nhiều ảnh">
-                <Icon name="layers" /> 
-              </Link>
-              <Link className="btn ghost sm" to={`/templates/${t.id}/edit`} title="Sửa">
-                <Icon name="edit" /> 
-              </Link>
-              <button className="btn ghost sm" onClick={() => remove(t)} title="Xoá">
-                <Icon name="trash" /> 
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-      <section className="collage-entry">
-        <div className="toolbar">
-          <h2 className="grow"><Icon name="grid" /> Ghép nhiều ảnh</h2>
-        </div>
-        <p className="hint">Chọn số ảnh muốn ghép – đổi bố cục, khoảng cách, bo góc thoải mái trong màn hình chỉnh sửa.</p>
         <div className="collage-counts">
           {COLLAGE_COUNTS.map((n) => (
             <Link key={n} to={`/collage?n=${n}`} className="collage-count">
-              <svg viewBox="0 0 40 50" width="40" height="50" aria-hidden>
+              <svg viewBox="0 0 40 50" width="34" height="42" aria-hidden>
                 {firstLayoutFor(n).cells.map(([x, y, w, h], i) => (
                   <rect key={i} x={x * 40 + 1} y={y * 50 + 1} width={w * 40 - 2} height={h * 50 - 2} rx="2" />
                 ))}
@@ -106,6 +131,7 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
       <PresetGallery />
     </div>
   );
