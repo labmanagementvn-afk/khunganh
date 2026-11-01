@@ -30,11 +30,24 @@ interface PhotoState {
   rotation: number;
 }
 
+/**
+ * Tỉ lệ để ảnh (đã xoay `rotation` độ) lấp đầy (cover) hoặc nằm gọn (contain) trong vùng w×h.
+ * cover: vùng w×h xoay ngược phải nằm lọt trong ảnh; contain: khung bao của ảnh đã xoay nằm lọt trong vùng.
+ */
 function fitScale(img: HTMLImageElement, rotation: number, w: number, h: number, mode: 'cover' | 'contain') {
-  const rotated = rotation % 180 !== 0;
-  const iw = rotated ? img.naturalHeight : img.naturalWidth;
-  const ih = rotated ? img.naturalWidth : img.naturalHeight;
-  return mode === 'cover' ? Math.max(w / iw, h / ih) : Math.min(w / iw, h / ih);
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const rad = (rotation * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(rad));
+  const sin = Math.abs(Math.sin(rad));
+  if (mode === 'cover') return Math.max((w * cos + h * sin) / iw, (w * sin + h * cos) / ih);
+  return Math.min(w / (iw * cos + ih * sin), h / (iw * sin + ih * cos));
+}
+
+/** Đưa góc về khoảng (-180, 180] */
+function normalizeAngle(deg: number) {
+  const a = ((((deg + 180) % 360) + 360) % 360) - 180;
+  return a === -180 ? 180 : a;
 }
 
 /** Toàn bộ trạng thái có thể Hoàn tác / Làm lại khi tạo ảnh */
@@ -79,7 +92,7 @@ export default function ComposePage() {
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const pinch = useRef<{ dist: number; cx: number; cy: number } | null>(null);
+  const pinch = useRef<{ dist: number; angle: number; cx: number; cy: number } | null>(null);
 
   const scale = useFitScale(wrapRef, tpl?.width ?? 1, tpl?.height ?? 1, 0.58);
   const fontsVersion = useFontsReady([...(tpl?.texts ?? []), ...extras].map((t) => t.fontFamily));
@@ -188,10 +201,15 @@ export default function ComposePage() {
     );
   }
 
+  /** Xoay ảnh quanh tâm của nó (thanh trượt) */
+  function setRotation(deg: number) {
+    setPhoto((p) => (p ? { ...p, rotation: normalizeAngle(deg) } : p), 'rotate');
+  }
+
   function rotate() {
     setPhoto((p) => {
       if (!p) return p;
-      const rotation = (p.rotation + 90) % 360;
+      const rotation = normalizeAngle(Math.round(p.rotation / 90) * 90 + 90);
       return {
         ...p,
         rotation,
@@ -215,21 +233,27 @@ export default function ComposePage() {
     const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
     const cx = (p1.x + p2.x) / 2;
     const cy = (p1.y + p2.y) / 2;
+    const angle = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
     const last = pinch.current;
-    pinch.current = { dist, cx, cy };
+    pinch.current = { dist, angle, cx, cy };
     if (!last) return;
     setPhoto((p) => {
       if (!p) return p;
       const s = Math.min(maxZoom, Math.max(minZoom, p.scale * (dist / last.dist)));
       const k = s / p.scale;
+      const delta = normalizeAngle(angle - last.angle);
+      const rad = (delta * Math.PI) / 180;
+      // Phóng to + xoay quanh tâm 2 ngón tay, đồng thời di chuyển theo ngón tay
+      const vx = p.cx - last.cx;
+      const vy = p.cy - last.cy;
       return {
         ...p,
         scale: s,
-        // Phóng to quanh tâm 2 ngón tay và di chuyển theo ngón tay
-        cx: cx + (p.cx - last.cx) * k,
-        cy: cy + (p.cy - last.cy) * k,
+        rotation: normalizeAngle(p.rotation + delta),
+        cx: cx + (vx * Math.cos(rad) - vy * Math.sin(rad)) * k,
+        cy: cy + (vx * Math.sin(rad) + vy * Math.cos(rad)) * k,
       };
-    }, 'zoom');
+    }, 'pinch');
   }
 
   function addExtraText() {
@@ -368,12 +392,6 @@ export default function ComposePage() {
     <div className="page editor">
       <div className="toolbar">
         <h1 className="grow ellipsis">{tpl.name}</h1>
-        <UndoRedoButtons
-          canUndo={history.canUndo}
-          canRedo={history.canRedo}
-          onUndo={history.undo}
-          onRedo={history.redo}
-        />
         <Link className="btn ghost sm" to={`/templates/${tpl.id}/edit`}>
           ✎ Sửa khung
         </Link>
@@ -441,6 +459,12 @@ export default function ComposePage() {
               </Layer>
             </Stage>
           </div>
+          <UndoRedoButtons
+            canUndo={history.canUndo}
+            canRedo={history.canRedo}
+            onUndo={history.undo}
+            onRedo={history.redo}
+          />
 
           <div className="chips">
             {photo && (
@@ -462,7 +486,7 @@ export default function ComposePage() {
           {photo && (
             <div className="panel">
               <label className="field">
-                <span>Thu phóng ảnh (hoặc dùng 2 ngón tay / con lăn chuột)</span>
+                <span>Thu phóng ảnh (hoặc chụm/mở 2 ngón tay, con lăn chuột)</span>
                 <input
                   type="range"
                   min={Math.log(minZoom)}
@@ -472,13 +496,36 @@ export default function ComposePage() {
                   onChange={(e) => setZoom(Math.exp(Number(e.target.value)))}
                 />
               </label>
+              <label className="field">
+                <span>
+                  Xoay ảnh: {Math.round(photo.rotation)}° (hoặc xoay 2 ngón tay)
+                </span>
+                <div className="row">
+                  <input
+                    className="grow"
+                    type="range"
+                    min={-180}
+                    max={180}
+                    step={1}
+                    value={Math.round(photo.rotation)}
+                    onChange={(e) => setRotation(Number(e.target.value))}
+                  />
+                  <button
+                    className="btn ghost sm"
+                    disabled={photo.rotation === 0}
+                    onClick={() => setPhoto((p) => (p ? { ...p, rotation: 0 } : p))}
+                  >
+                    0°
+                  </button>
+                </div>
+              </label>
               <div className="row wrap">
                 <button className="btn ghost sm" onClick={() => fit('cover')}>⛶ Lấp đầy</button>
                 <button className="btn ghost sm" onClick={() => fit('contain')}>▣ Hiện toàn bộ</button>
                 <button className="btn ghost sm" onClick={rotate}>⟳ Xoay 90°</button>
                 <button className="btn ghost sm" onClick={() => fileInput.current?.click()}>🔁 Đổi ảnh</button>
               </div>
-              <p className="hint">Kéo ảnh để di chuyển vị trí trong khung.</p>
+              <p className="hint">Kéo ảnh để di chuyển. Dùng 2 ngón tay để vừa phóng to/thu nhỏ vừa xoay ảnh.</p>
             </div>
           )}
         </div>

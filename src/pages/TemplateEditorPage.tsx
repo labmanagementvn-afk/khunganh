@@ -386,12 +386,6 @@ export default function TemplateEditorPage() {
           value={tpl.name}
           onChange={(e) => update({ name: e.target.value }, 'name')}
         />
-        <UndoRedoButtons
-          canUndo={history.canUndo}
-          canRedo={history.canRedo}
-          onUndo={history.undo}
-          onRedo={history.redo}
-        />
         <button className="btn primary" disabled={saving} onClick={save}>
           {saving ? 'Đang lưu…' : '💾 Lưu khung'}
         </button>
@@ -450,6 +444,12 @@ export default function TemplateEditorPage() {
               </Layer>
             </Stage>
           </div>
+          <UndoRedoButtons
+            canUndo={history.canUndo}
+            canRedo={history.canRedo}
+            onUndo={history.undo}
+            onRedo={history.redo}
+          />
 
           <div className="chips">
             {hasFrame && (

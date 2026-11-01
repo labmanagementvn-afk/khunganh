@@ -171,5 +171,7 @@ input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--primary)
 @keyframes spin { to { transform: rotate(360deg); } }
 .canvas-col, .side-col { min-width: 0; }
 .field.inline > span { white-space: nowrap; }
-.undo-redo button { font-size: 1.15rem; padding: 6px 14px; min-height: 40px; }
+.undo-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.undo-bar .btn { min-height: 44px; }
+.undo-bar .btn:disabled { color: #a3a7b8; }
 .seg button:disabled { color: #b8bbc9; cursor: not-allowed; background: var(--surface); }
