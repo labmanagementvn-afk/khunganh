@@ -1,6 +1,6 @@
 import Konva from 'konva';
 import { useEffect, useRef, useState } from 'react';
-import { Group, Image as KImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva';
+import { Group, Image as KImage, Layer, Rect, Shape, Stage, Text, Transformer } from 'react-konva';
 import { useSearchParams } from 'react-router-dom';
 import { AdjustSliders, FilterPicker } from '../components/PhotoAdjustPanels';
 import { ResultModal } from '../components/ResultModal';
@@ -17,15 +17,14 @@ import {
   ASPECTS,
   COLLAGE_COUNTS,
   COLLAGE_LAYOUTS,
-  cellRects,
   firstLayoutFor,
   layoutById,
+  layoutGeometry,
   type AspectId,
   type CollageLayout,
 } from '../lib/collageLayouts';
 import { fitScale, normalizeAngle } from '../lib/compose';
 import { useFontsReady } from '../lib/fonts';
-import { slotClip } from '../lib/geometry';
 import { historyEntry } from '../lib/history';
 import { newId } from '../lib/id';
 import { canvasToBlob, prepareImageFile } from '../lib/image';
@@ -81,14 +80,29 @@ function placement(p: CellPhoto, box: Box) {
   };
 }
 
+/** Hình minh hoạ bố cục (dùng chung cho trang chủ) */
+function LayoutIcon({ layout }: { layout: CollageLayout }) {
+  return (
+    <svg viewBox="0 0 40 50" width="40" height="50" aria-hidden>
+      {layout.shapes
+        ? layout.shapes.map((sh, i) =>
+            sh.kind === 'circle' ? (
+              <circle key={i} cx={sh.cx * 40} cy={sh.cy * 50} r={sh.r * 40 - 1} />
+            ) : (
+              <polygon key={i} points={sh.points.map(([x, y]) => `${x * 40},${y * 50}`).join(' ')} />
+            ),
+          )
+        : layout.cells.map(([x, y, w, h], i) => (
+            <rect key={i} x={x * 40 + 1} y={y * 50 + 1} width={w * 40 - 2} height={h * 50 - 2} rx="2" />
+          ))}
+    </svg>
+  );
+}
+
 function LayoutThumb({ layout, active, onClick }: { layout: CollageLayout; active: boolean; onClick: () => void }) {
   return (
     <button className={active ? 'layout-item on' : 'layout-item'} onClick={onClick} title={layout.name}>
-      <svg viewBox="0 0 40 50" width="40" height="50">
-        {layout.cells.map(([x, y, w, h], i) => (
-          <rect key={i} x={x * 40 + 1} y={y * 50 + 1} width={w * 40 - 2} height={h * 50 - 2} rx="2" />
-        ))}
-      </svg>
+      <LayoutIcon layout={layout} />
       <span>{layout.name}</span>
     </button>
   );
@@ -134,7 +148,8 @@ export default function CollagePage() {
   const aspect = ASPECTS.find((a) => a.id === doc.aspect) ?? ASPECTS[1];
   const W = aspect.w;
   const H = aspect.h;
-  const boxes = cellRects(layout, W, H, doc.padding, doc.gap);
+  const geoms = layoutGeometry(layout, W, H, doc.padding, doc.gap, doc.radius);
+  const boxes = geoms.map((g) => g.box);
 
   const [selected, setSelected] = useState<string | null>(null);
   const [swapFrom, setSwapFrom] = useState<number | null>(null);
@@ -387,51 +402,70 @@ export default function CollagePage() {
             >
               <Layer>
                 <Rect width={W} height={H} fill={doc.background} onMouseDown={() => setSelected(null)} onTouchStart={() => setSelected(null)} />
-                {boxes.map((b, i) => {
+                {geoms.map((g, i) => {
                   const p = doc.photos[i];
-                  const clip = { ...b, radius: doc.radius };
+                  const b = g.box;
                   return (
-                    <Group key={`${layout.id}-${i}`}>
-                      <Group clipFunc={(ctx) => slotClip(ctx, clip)}>
-                        {p ? (
-                          <CellImage
-                            photo={p}
-                            box={b}
-                            index={i}
-                            onSelect={() => onCellTap(i)}
-                            onMove={(dx, dy) => updatePhoto(i, { dx, dy })}
-                          />
-                        ) : (
-                          <Group name="ui" onClick={() => onCellTap(i)} onTap={() => onCellTap(i)}>
-                            <Rect {...b} fill="#eef0ff" />
-                            <Text
-                              x={b.x}
-                              y={b.y + b.height / 2 - 18 / scale}
-                              width={b.width}
-                              align="center"
-                              text={`＋\nẢnh ${i + 1}`}
-                              fontSize={18 / scale}
-                              lineHeight={1.2}
-                              fontStyle="bold"
-                              fill="#4f46e5"
-                            />
-                          </Group>
-                        )}
-                      </Group>
-                      {(selCell === i || swapFrom !== null) && (
-                        <Rect
-                          name="ui"
-                          {...b}
-                          cornerRadius={doc.radius}
-                          stroke={selCell === i ? '#4f46e5' : '#f59e0b'}
-                          strokeWidth={3 / scale}
-                          dash={swapFrom !== null && selCell !== i ? [8 / scale, 6 / scale] : undefined}
-                          listening={false}
+                    <Group key={`${layout.id}-${i}`} clipFunc={(ctx) => g.trace(ctx)}>
+                      {p ? (
+                        <CellImage
+                          photo={p}
+                          box={b}
+                          index={i}
+                          onSelect={() => onCellTap(i)}
+                          onMove={(dx, dy) => updatePhoto(i, { dx, dy })}
                         />
+                      ) : (
+                        <Group name="ui" onClick={() => onCellTap(i)} onTap={() => onCellTap(i)}>
+                          <Rect {...b} fill="#eef0ff" />
+                          <Text
+                            x={g.center.x - 60 / scale}
+                            y={g.center.y - 18 / scale}
+                            width={120 / scale}
+                            align="center"
+                            text={`＋\nẢnh ${i + 1}`}
+                            fontSize={18 / scale}
+                            lineHeight={1.2}
+                            fontStyle="bold"
+                            fill="#4f46e5"
+                          />
+                        </Group>
                       )}
                     </Group>
                   );
                 })}
+                {/* Kiểu hiện đại: khoảng cách giữa các ô là viền màu nền vẽ đè lên mép ảnh */}
+                {layout.styled &&
+                  doc.gap > 0 &&
+                  geoms.map((g, i) => (
+                    <Shape
+                      key={`gap-${layout.id}-${i}`}
+                      sceneFunc={(ctx, shape) => {
+                        g.trace(ctx);
+                        ctx.strokeShape(shape);
+                      }}
+                      stroke={doc.background}
+                      strokeWidth={doc.gap}
+                      lineJoin="round"
+                      listening={false}
+                    />
+                  ))}
+                {geoms.map((g, i) =>
+                  selCell === i || swapFrom !== null ? (
+                    <Shape
+                      key={`sel-${layout.id}-${i}`}
+                      name="ui"
+                      sceneFunc={(ctx, shape) => {
+                        g.trace(ctx);
+                        ctx.strokeShape(shape);
+                      }}
+                      stroke={selCell === i ? '#4f46e5' : '#f59e0b'}
+                      strokeWidth={3 / scale}
+                      dash={swapFrom !== null && selCell !== i ? [8 / scale, 6 / scale] : undefined}
+                      listening={false}
+                    />
+                  ) : null,
+                )}
                 {doc.texts.map((t) => (
                   <TextNode
                     key={t.id + fontsVersion}
