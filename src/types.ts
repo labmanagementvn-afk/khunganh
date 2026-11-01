@@ -58,6 +58,8 @@ export interface Template {
   thumbnail: string;
   createdAt: number;
   updatedAt: number;
+  /** Ngành (dùng để lọc trên Bảng tin) */
+  category?: string;
   /** Mã bản chia sẻ công khai (nếu chủ khung đã chia sẻ) */
   publicId?: string;
   /** Khung được sao chép từ mẫu công khai nào */

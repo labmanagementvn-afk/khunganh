@@ -64,6 +64,11 @@ export default function PublicTemplatePage() {
       <h1>{p.name}</h1>
       <div className="public-meta muted">
         <OwnerBadge name={p.ownerName} photo={p.ownerPhoto} />
+        {p.category && (
+          <Link to={`/feed?nganh=${encodeURIComponent(p.category)}`} className="category-link">
+            {p.category}
+          </Link>
+        )}
         <span>
           {p.width}×{p.height}
         </span>

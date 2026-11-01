@@ -189,6 +189,7 @@ export function createFirebaseBackend(config: Record<string, string>): Backend {
       const data: Omit<PublicTemplate, 'uses' | 'publishedAt'> = {
         id,
         name: tpl.name,
+        category: tpl.category ?? 'Khác',
         width: tpl.width,
         height: tpl.height,
         background: tpl.background,
@@ -235,8 +236,26 @@ export function createFirebaseBackend(config: Record<string, string>): Backend {
       await Promise.all(Array.from({ length: chunks }, (_, i) => deleteDoc(doc(db, 'publicTemplates', publicId, 'chunks', String(i)))));
       await deleteDoc(ref);
     },
-    async listPublic({ limit: n, after, ownerUid }) {
+    async listPublic({ limit: n, after, ownerUid, category }) {
       const col = collection(db, 'publicTemplates');
+      if (category && !ownerUid) {
+        // Lọc theo ngành + mới nhất trước: cần chỉ mục ghép (firestore.indexes.json).
+        // Khi chỉ mục chưa được tạo / đang xây, lấy theo ngành rồi sắp xếp trên trình duyệt.
+        try {
+          const q = after
+            ? query(col, where('category', '==', category), orderBy('publishedAt', 'desc'), startAfter(after), limit(n))
+            : query(col, where('category', '==', category), orderBy('publishedAt', 'desc'), limit(n));
+          return (await getDocs(q)).docs.map((d) => ({ ...(d.data() as PublicTemplate), id: d.id }));
+        } catch (e) {
+          if ((e as { code?: string }).code !== 'failed-precondition') throw e;
+          const snap = await getDocs(query(col, where('category', '==', category), limit(300)));
+          return snap.docs
+            .map((d) => ({ ...(d.data() as PublicTemplate), id: d.id }))
+            .filter((x) => x.publishedAt && (!after || x.publishedAt < after))
+            .sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0))
+            .slice(0, n);
+        }
+      }
       const q = ownerUid
         ? query(col, where('ownerUid', '==', ownerUid))
         : after

@@ -133,6 +133,7 @@ export const localBackend: Backend = {
     const meta: PublicTemplate = {
       id,
       name: tpl.name,
+      category: tpl.category ?? 'Khác',
       width: tpl.width,
       height: tpl.height,
       background: tpl.background,
@@ -156,10 +157,10 @@ export const localBackend: Backend = {
   async unpublishTemplate(_owner, publicId) {
     await delOne('public', publicId);
   },
-  async listPublic({ limit, after, ownerUid }) {
+  async listPublic({ limit, after, ownerUid, category }) {
     const all = (await getAll<{ meta: PublicTemplate }>('public')).map((r) => r.meta);
     return all
-      .filter((m) => (!ownerUid || m.ownerUid === ownerUid) && (!after || (m.publishedAt ?? 0) < after))
+      .filter((m) => (!ownerUid || m.ownerUid === ownerUid) && (!category || m.category === category) && (!after || (m.publishedAt ?? 0) < after))
       .sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0))
       .slice(0, ownerUid ? undefined : limit);
   },

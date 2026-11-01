@@ -32,6 +32,7 @@ export async function copyPublicTemplate(store: Backend, pub: Backend, uid: stri
   const tpl: Template = {
     id: newId(),
     name: p.name,
+    category: p.category,
     width: p.width,
     height: p.height,
     background: p.background,

@@ -17,6 +17,7 @@ export function PublicCard({ p, busy, disabled, onUse }: { p: PublicTemplate; bu
     <div className="tpl-card">
       <Link className="tpl-thumb" to={`/t/${p.id}`} title="Xem mẫu">
         {p.thumbnail ? <img src={p.thumbnail} alt={p.name} loading="lazy" /> : <Icon name="image" size={28} />}
+        {p.category && <span className="category-tag">{p.category}</span>}
       </Link>
       <div className="tpl-info">
         <strong className="ellipsis">{p.name}</strong>

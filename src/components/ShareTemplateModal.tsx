@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSession } from '../lib/auth';
+import { INDUSTRIES } from '../lib/industries';
 import { publicUrl, publishTemplate, unpublishTemplate } from '../lib/publicTemplates';
 import type { Template } from '../types';
 import { Icon } from './Icon';
@@ -57,15 +58,23 @@ interface Props {
 export function ShareTemplateModal({ template, onClose, onChanged }: Props) {
   const { user, store, pub } = useSession();
   const [tpl, setTpl] = useState(template);
+  const [category, setCategory] = useState(template.category ?? '');
   const [busy, setBusy] = useState<'' | 'publish' | 'unpublish'>('');
   const [error, setError] = useState('');
 
   async function run(kind: 'publish' | 'unpublish') {
     if (!user) return;
+    if (kind === 'publish' && !category) {
+      setError('Hãy chọn ngành để mọi người tìm thấy khung của bạn.');
+      return;
+    }
     setBusy(kind);
     setError('');
     try {
-      const next = kind === 'publish' ? await publishTemplate(store, pub, user, tpl) : await unpublishTemplate(store, pub, user, tpl);
+      // Lưu ngành vào khung trước khi chia sẻ
+      const base = { ...tpl, category: category || tpl.category };
+      if (base.category !== tpl.category) await store.saveTemplate(user.uid, base);
+      const next = kind === 'publish' ? await publishTemplate(store, pub, user, base) : await unpublishTemplate(store, pub, user, base);
       setTpl(next);
       onChanged(next);
     } catch (e) {
@@ -99,6 +108,23 @@ export function ShareTemplateModal({ template, onClose, onChanged }: Props) {
             </small>
           </div>
         </div>
+
+        {user && (
+          <label className="field">
+            <span>Ngành</span>
+            <select value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="" disabled>
+                Chọn ngành…
+              </option>
+              {INDUSTRIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            {tpl.publicId && category !== (tpl.category ?? '') && <small>Bấm “Cập nhật bản chia sẻ” để áp dụng ngành mới.</small>}
+          </label>
+        )}
 
         {!user ? (
           <>

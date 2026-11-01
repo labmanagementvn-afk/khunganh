@@ -23,7 +23,7 @@ export interface Backend {
   /** Chia sẻ (hoặc cập nhật bản chia sẻ) một khung; trả về mã công khai */
   publishTemplate(owner: AppUser, template: Template, frame: Blob | null): Promise<string>;
   unpublishTemplate(owner: AppUser, publicId: string): Promise<void>;
-  listPublic(opts: { limit: number; after?: number; ownerUid?: string }): Promise<PublicTemplate[]>;
+  listPublic(opts: { limit: number; after?: number; ownerUid?: string; category?: string }): Promise<PublicTemplate[]>;
   getPublic(publicId: string): Promise<PublicTemplate | null>;
   getPublicFrame(publicId: string): Promise<Blob | null>;
   /** Tăng bộ đếm số lần dùng (bỏ qua lỗi) */
