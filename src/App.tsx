@@ -3,6 +3,7 @@ import { HashRouter, Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import { backend } from './lib/backend';
 import { AuthProvider, useAuth } from './lib/auth';
 import BatchPage from './pages/BatchPage';
+import CollagePage from './pages/CollagePage';
 import ComposePage from './pages/ComposePage';
 import HistoryPage from './pages/HistoryPage';
 import HomePage from './pages/HomePage';
@@ -21,6 +22,7 @@ function Shell({ children }: { children: ReactNode }) {
         </NavLink>
         <nav>
           <NavLink to="/" end>Khung mẫu</NavLink>
+          <NavLink to="/collage">Ghép ảnh</NavLink>
           <NavLink to="/history">Lịch sử</NavLink>
         </nav>
         {user ? (
@@ -58,6 +60,7 @@ export default function App() {
           <Route path="/templates/:id/edit" element={<Shell><TemplateEditorPage /></Shell>} />
           <Route path="/compose/:id" element={<Shell><ComposePage /></Shell>} />
           <Route path="/batch/:id" element={<Shell><BatchPage /></Shell>} />
+          <Route path="/collage" element={<Shell><CollagePage /></Shell>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </HashRouter>

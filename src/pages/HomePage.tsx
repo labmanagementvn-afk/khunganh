@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PresetGallery } from '../components/PresetGallery';
 import { useSession } from '../lib/auth';
+import { COLLAGE_COUNTS, firstLayoutFor } from '../lib/collageLayouts';
 import type { Template } from '../types';
 
 export default function HomePage() {
@@ -86,6 +87,24 @@ export default function HomePage() {
           </div>
         ))}
       </div>
+      <section className="collage-entry">
+        <div className="toolbar">
+          <h2 className="grow">🧩 Ghép nhiều ảnh</h2>
+        </div>
+        <p className="hint">Chọn số ảnh muốn ghép – đổi bố cục, khoảng cách, bo góc thoải mái trong màn hình chỉnh sửa.</p>
+        <div className="collage-counts">
+          {COLLAGE_COUNTS.map((n) => (
+            <Link key={n} to={`/collage?n=${n}`} className="collage-count">
+              <svg viewBox="0 0 40 50" width="40" height="50" aria-hidden>
+                {firstLayoutFor(n).cells.map(([x, y, w, h], i) => (
+                  <rect key={i} x={x * 40 + 1} y={y * 50 + 1} width={w * 40 - 2} height={h * 50 - 2} rx="2" />
+                ))}
+              </svg>
+              {n} ảnh
+            </Link>
+          ))}
+        </div>
+      </section>
       <PresetGallery />
     </div>
   );
