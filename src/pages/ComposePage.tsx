@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ResultModal } from '../components/ResultModal';
 import { TextNode, createTextElement } from '../components/TextNode';
 import { TextPropsPanel } from '../components/TextPropsPanel';
+import { useArrowNudge } from '../components/useArrowNudge';
 import { useFitScale } from '../components/useFitScale';
 import { backend } from '../lib/backend';
 import { useUser } from '../lib/auth';
@@ -44,7 +45,10 @@ export default function ComposePage() {
   const [frameImg, setFrameImg] = useState<HTMLImageElement | null>(null);
   const [photo, setPhoto] = useState<PhotoState | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
+  /** Bản sao các text của khung – chỉnh sửa ở đây chỉ áp dụng cho ảnh đang tạo (trừ khi lưu vào khung) */
+  const [texts, setTexts] = useState<TextElement[]>([]);
   const [extras, setExtras] = useState<TextElement[]>([]);
+  const [savingStyle, setSavingStyle] = useState<'' | 'saving' | 'saved'>('');
   const [selected, setSelected] = useState<string | null>(null);
   const [format, setFormat] = useState<'image/jpeg' | 'image/png'>('image/jpeg');
   const [busy, setBusy] = useState(false);
@@ -68,6 +72,7 @@ export default function ComposePage() {
         if (!t) throw new Error('Không tìm thấy khung mẫu');
         if (!alive) return;
         setTpl(t);
+        setTexts(t.texts);
         const init: Record<string, string> = {};
         t.texts.filter((x) => x.kind === 'input').forEach((x) => (init[labelOf(x)] ??= ''));
         setValues(init);
@@ -88,14 +93,29 @@ export default function ComposePage() {
     const tr = trRef.current;
     const stage = stageRef.current;
     if (!tr || !stage) return;
-    const node = selected ? stage.findOne('#' + selected) : null;
+    // Ảnh sản phẩm dùng kéo / thu phóng riêng, không gắn transformer
+    const node = selected && selected !== 'photo' ? stage.findOne('#' + selected) : null;
     tr.nodes(node ? [node] : []);
     tr.getLayer()?.batchDraw();
-  }, [selected, extras, fontsVersion]);
+  }, [selected, texts, extras, values, fontsVersion]);
+
+  useArrowNudge(
+    selected
+      ? (dx, dy) => {
+          if (selected === 'photo') {
+            setPhoto((p) => (p ? { ...p, cx: p.cx + dx, cy: p.cy + dy } : p));
+            return;
+          }
+          const move = (xs: TextElement[]) => xs.map((x) => (x.id === selected ? { ...x, x: x.x + dx, y: x.y + dy } : x));
+          setTexts(move);
+          setExtras(move);
+        }
+      : null,
+  );
 
   const inputLabels = useMemo(
-    () => Array.from(new Set((tpl?.texts ?? []).filter((t) => t.kind === 'input').map(labelOf))),
-    [tpl],
+    () => Array.from(new Set(texts.filter((t) => t.kind === 'input').map(labelOf))),
+    [texts],
   );
 
   if (error && !tpl) return <div className="page"><p className="error">{error}</p></div>;
@@ -199,6 +219,9 @@ export default function ComposePage() {
     setSelected(el.id);
   }
 
+  const updateText = (tid: string, patch: Partial<TextElement>) =>
+    setTexts((xs) => xs.map((x) => (x.id === tid ? { ...x, ...patch } : x)));
+
   const displayValue = (t: TextElement) => (t.kind === 'input' ? values[labelOf(t)] ?? '' : t.text);
 
   async function exportImage() {
@@ -210,9 +233,11 @@ export default function ComposePage() {
       setSelected(null);
       const stage = stageRef.current!;
       stage.findOne('#slot-hint')?.hide();
+      stage.find('.placeholder').forEach((n) => n.hide());
       stage.draw();
       const canvas = stage.toCanvas({ pixelRatio: tpl.width / stage.width() });
       stage.findOne('#slot-hint')?.show();
+      stage.find('.placeholder').forEach((n) => n.show());
       const blob = await canvasToBlob(canvas, format, format === 'image/jpeg' ? 0.92 : undefined);
       const code = Object.values(values).filter(Boolean).join('_');
       const name = `${safeFileName(code || tpl.name)}-${Date.now().toString(36)}.${format === 'image/png' ? 'png' : 'jpg'}`;
@@ -269,8 +294,8 @@ export default function ComposePage() {
           scaleY={photo.scale}
           rotation={photo.rotation}
           draggable
-          onMouseDown={() => setSelected(null)}
-          onTouchStart={() => setSelected(null)}
+          onMouseDown={() => setSelected('photo')}
+          onTouchStart={() => setSelected('photo')}
           onDragEnd={(e) => {
             const x = e.target.x();
             const y = e.target.y();
@@ -296,6 +321,23 @@ export default function ComposePage() {
   );
 
   const selExtra = extras.find((x) => x.id === selected);
+  const selText = texts.find((x) => x.id === selected);
+  const original = (id: string) => tpl.texts.find((x) => x.id === id);
+  const textsChanged = JSON.stringify(texts) !== JSON.stringify(tpl.texts);
+
+  async function saveStyleToTemplate() {
+    if (!tpl) return;
+    setSavingStyle('saving');
+    try {
+      const updated = { ...tpl, texts, updatedAt: Date.now() };
+      await backend.saveTemplate(user.uid, updated);
+      setTpl(updated);
+      setSavingStyle('saved');
+    } catch (e) {
+      setError('Không lưu được vào khung: ' + (e as Error).message);
+      setSavingStyle('');
+    }
+  }
 
   return (
     <div className="page editor">
@@ -330,9 +372,23 @@ export default function ComposePage() {
               <Layer>
                 <Rect width={tpl.width} height={tpl.height} fill={tpl.background} listening={false} />
                 {tpl.photoOnTop ? [frameNode, photoNode] : [photoNode, frameNode]}
-                {tpl.texts.map((t) => (
-                  <TextNode key={t.id + fontsVersion} el={t} value={displayValue(t)} interactive={false} />
-                ))}
+                {texts.map((t) => {
+                  const v = displayValue(t);
+                  // Text nhập chưa có giá trị: hiện mờ tên ô để vẫn chọn/kéo được (ẩn khi xuất ảnh)
+                  const empty = t.kind === 'input' && !v;
+                  return (
+                    <TextNode
+                      key={t.id + fontsVersion}
+                      el={t}
+                      value={empty ? `‹${labelOf(t)}›` : v}
+                      opacity={empty ? 0.35 : 1}
+                      name={empty ? 'placeholder' : 'text'}
+                      interactive
+                      onSelect={() => setSelected(t.id)}
+                      onChange={(p) => updateText(t.id, p)}
+                    />
+                  );
+                })}
                 {extras.map((t) => (
                   <TextNode
                     key={t.id + fontsVersion}
@@ -354,6 +410,23 @@ export default function ComposePage() {
               </Layer>
             </Stage>
           </div>
+
+          <div className="chips">
+            {photo && (
+              <button className={selected === 'photo' ? 'chip on' : 'chip'} onClick={() => setSelected('photo')}>
+                📷 Ảnh
+              </button>
+            )}
+            {[...texts, ...extras].map((t) => (
+              <button key={t.id} className={selected === t.id ? 'chip on' : 'chip'} onClick={() => setSelected(t.id)}>
+                {t.kind === 'input' ? '✏️ ' + labelOf(t) : '🔤 ' + (t.text.slice(0, 14) || 'Text')}
+              </button>
+            ))}
+          </div>
+          <p className="hint">
+            Chạm vào chữ để chỉnh vị trí, màu, cỡ chữ… cho ảnh này. Trên máy tính: phím mũi tên dịch chuyển phần tử đang
+            chọn (giữ Shift: 10px).
+          </p>
 
           {photo && (
             <div className="panel">
@@ -394,7 +467,7 @@ export default function ComposePage() {
                   <span>{label}</span>
                   <input
                     value={values[label] ?? ''}
-                    placeholder={tpl.texts.find((t) => t.kind === 'input' && labelOf(t) === label)?.text || label}
+                    placeholder={texts.find((t) => t.kind === 'input' && labelOf(t) === label)?.text || label}
                     onChange={(e) => setValues((v) => ({ ...v, [label]: e.target.value }))}
                     autoCapitalize="characters"
                   />
@@ -402,6 +475,58 @@ export default function ComposePage() {
               ))}
             </div>
           )}
+
+          {selText && (
+            <div className="panel">
+              <h3>{selText.kind === 'input' ? '✏️ ' + labelOf(selText) : '🔤 Text của khung'}</h3>
+              <TextPropsPanel
+                el={selText}
+                canvasWidth={tpl.width}
+                allowKind={false}
+                content={
+                  selText.kind === 'input'
+                    ? {
+                        label: labelOf(selText),
+                        value: values[labelOf(selText)] ?? '',
+                        onChange: (v) => setValues((vs) => ({ ...vs, [labelOf(selText)]: v })),
+                      }
+                    : undefined
+                }
+                onChange={(p) => updateText(selText.id, p)}
+                onReset={
+                  original(selText.id) &&
+                  JSON.stringify(original(selText.id)) !== JSON.stringify(selText)
+                    ? () => updateText(selText.id, original(selText.id)!)
+                    : undefined
+                }
+                onDelete={() => {
+                  setTexts((xs) => xs.filter((x) => x.id !== selText.id));
+                  setSelected(null);
+                }}
+              />
+            </div>
+          )}
+
+          {textsChanged && (
+            <div className="panel">
+              <p className="hint">Bạn đã chỉnh chữ của khung cho ảnh này. Lưu lại để lần sau dùng luôn kiểu này?</p>
+              <div className="row wrap">
+                <button className="btn sm" disabled={savingStyle === 'saving'} onClick={saveStyleToTemplate}>
+                  {savingStyle === 'saving' ? 'Đang lưu…' : '💾 Lưu vào khung mẫu'}
+                </button>
+                <button
+                  className="btn ghost sm"
+                  onClick={() => {
+                    setTexts(tpl.texts);
+                    setSelected(null);
+                  }}
+                >
+                  ↺ Bỏ tất cả chỉnh sửa
+                </button>
+              </div>
+            </div>
+          )}
+          {!textsChanged && savingStyle === 'saved' && <p className="hint">✓ Đã lưu kiểu chữ vào khung mẫu.</p>}
 
           <div className="panel">
             <div className="row wrap">

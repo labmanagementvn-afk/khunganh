@@ -9,9 +9,13 @@ interface Props {
   onChange: (patch: Partial<TextElement>) => void;
   onDelete: () => void;
   onDuplicate?: () => void;
+  /** Thay ô "Nội dung" bằng ô nhập giá trị (dùng cho text nhập ở trang tạo ảnh) */
+  content?: { label: string; value: string; onChange: (v: string) => void };
+  /** Khôi phục kiểu chữ & vị trí theo khung mẫu */
+  onReset?: () => void;
 }
 
-export function TextPropsPanel({ el, canvasWidth, allowKind, onChange, onDelete, onDuplicate }: Props) {
+export function TextPropsPanel({ el, canvasWidth, allowKind, onChange, onDelete, onDuplicate, content, onReset }: Props) {
   const bold = el.fontStyle.includes('bold');
   const italic = el.fontStyle.includes('italic');
   const setStyle = (b: boolean, i: boolean) =>
@@ -42,10 +46,17 @@ export function TextPropsPanel({ el, canvasWidth, allowKind, onChange, onDelete,
         </label>
       )}
 
-      <label className="field">
-        <span>{el.kind === 'input' ? 'Giá trị mẫu / mặc định' : 'Nội dung'}</span>
-        <textarea rows={2} value={el.text} onChange={(e) => onChange({ text: e.target.value })} />
-      </label>
+      {content ? (
+        <label className="field">
+          <span>{content.label}</span>
+          <textarea rows={2} value={content.value} onChange={(e) => content.onChange(e.target.value)} />
+        </label>
+      ) : (
+        <label className="field">
+          <span>{el.kind === 'input' ? 'Giá trị mẫu / mặc định' : 'Nội dung'}</span>
+          <textarea rows={2} value={el.text} onChange={(e) => onChange({ text: e.target.value })} />
+        </label>
+      )}
 
       <div className="row">
         <label className="field grow">
@@ -121,6 +132,11 @@ export function TextPropsPanel({ el, canvasWidth, allowKind, onChange, onDelete,
         {el.rotation !== 0 && (
           <button className="btn ghost sm" onClick={() => onChange({ rotation: 0 })}>
             ⟲ Bỏ xoay
+          </button>
+        )}
+        {onReset && (
+          <button className="btn ghost sm" onClick={onReset}>
+            ↺ Như khung mẫu
           </button>
         )}
         {onDuplicate && (

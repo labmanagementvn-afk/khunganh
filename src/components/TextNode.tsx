@@ -8,15 +8,17 @@ interface Props {
   value: string;
   interactive: boolean;
   opacity?: number;
+  /** Tên node Konva (vd: 'placeholder' để ẩn khi xuất ảnh) */
+  name?: string;
   onSelect?: () => void;
   onChange?: (patch: Partial<TextElement>) => void;
 }
 
-export function TextNode({ el, value, interactive, opacity = 1, onSelect, onChange }: Props) {
+export function TextNode({ el, value, interactive, opacity = 1, name = 'text', onSelect, onChange }: Props) {
   return (
     <Text
       id={el.id}
-      name="text"
+      name={name}
       x={el.x}
       y={el.y}
       width={el.width}
