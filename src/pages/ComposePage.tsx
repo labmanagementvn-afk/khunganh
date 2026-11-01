@@ -16,6 +16,7 @@ import { backend } from '../lib/backend';
 import { useUser } from '../lib/auth';
 import { useFontsReady } from '../lib/fonts';
 import { slotClip } from '../lib/geometry';
+import { defaultValues, fitScale, labelOf, normalizeAngle } from '../lib/compose';
 import { newId } from '../lib/id';
 import { DEFAULT_ADJUST, isIdentity, renderAdjusted, type PhotoAdjust } from '../lib/photoFilters';
 import { blobToImage, canvasToBlob, makeThumbnail, prepareImageFile } from '../lib/image';
@@ -36,26 +37,6 @@ interface PhotoState {
   adjust: PhotoAdjust;
 }
 
-/**
- * Tỉ lệ để ảnh (đã xoay `rotation` độ) lấp đầy (cover) hoặc nằm gọn (contain) trong vùng w×h.
- * cover: vùng w×h xoay ngược phải nằm lọt trong ảnh; contain: khung bao của ảnh đã xoay nằm lọt trong vùng.
- */
-function fitScale(img: HTMLImageElement, rotation: number, w: number, h: number, mode: 'cover' | 'contain') {
-  const iw = img.naturalWidth;
-  const ih = img.naturalHeight;
-  const rad = (rotation * Math.PI) / 180;
-  const cos = Math.abs(Math.cos(rad));
-  const sin = Math.abs(Math.sin(rad));
-  if (mode === 'cover') return Math.max((w * cos + h * sin) / iw, (w * sin + h * cos) / ih);
-  return Math.min(w / (iw * cos + ih * sin), h / (iw * sin + ih * cos));
-}
-
-/** Đưa góc về khoảng (-180, 180] */
-function normalizeAngle(deg: number) {
-  const a = ((((deg + 180) % 360) + 360) % 360) - 180;
-  return a === -180 ? 180 : a;
-}
-
 /** Toàn bộ trạng thái có thể Hoàn tác / Làm lại khi tạo ảnh */
 interface ComposeDoc {
   photo: PhotoState | null;
@@ -65,14 +46,6 @@ interface ComposeDoc {
   extras: TextElement[];
 }
 
-const labelOf = (t: TextElement) => (t.label || 'Text nhập').trim();
-
-/** Giá trị ban đầu của các ô nhập = giá trị mặc định đặt trong khung mẫu */
-function defaultValues(texts: TextElement[]): Record<string, string> {
-  const v: Record<string, string> = {};
-  texts.filter((x) => x.kind === 'input').forEach((x) => (v[labelOf(x)] ??= x.text));
-  return v;
-}
 
 export default function ComposePage() {
   const { id } = useParams();
@@ -424,6 +397,9 @@ export default function ComposePage() {
     <div className="page editor">
       <div className="toolbar">
         <h1 className="grow ellipsis">{tpl.name}</h1>
+        <Link className="btn ghost sm" to={`/batch/${tpl.id}`} title="Chọn nhiều ảnh, tạo nhiều kết quả cùng lúc">
+          📚 Hàng loạt
+        </Link>
         <Link className="btn ghost sm" to={`/templates/${tpl.id}/edit`}>
           ✎ Sửa khung
         </Link>

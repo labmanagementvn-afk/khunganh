@@ -63,6 +63,9 @@ export default function HomePage() {
               <Link className="btn primary sm grow" to={`/compose/${t.id}`}>
                 Dùng khung
               </Link>
+              <Link className="btn ghost sm" to={`/batch/${t.id}`} title="Tạo hàng loạt từ nhiều ảnh">
+                📚
+              </Link>
               <Link className="btn ghost sm" to={`/templates/${t.id}/edit`} title="Sửa">
                 ✎
               </Link>

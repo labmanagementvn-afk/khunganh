@@ -18,6 +18,18 @@ export function canShareFiles(): boolean {
   }
 }
 
+/** Chia sẻ nhiều ảnh một lần (iPhone: "Lưu N hình ảnh"). Trả về false nếu thiết bị không hỗ trợ. */
+export async function shareBlobs(files: { blob: Blob; name: string }[]): Promise<boolean> {
+  const list = files.map((f) => new File([f.blob], f.name, { type: f.blob.type }));
+  if (typeof navigator.canShare !== 'function' || !navigator.canShare({ files: list })) return false;
+  try {
+    await navigator.share({ files: list });
+  } catch (e) {
+    if ((e as Error).name !== 'AbortError') throw e;
+  }
+  return true;
+}
+
 /** Mở bảng chia sẻ của hệ điều hành – trên iPhone/Android có mục "Lưu hình ảnh" / "Lưu vào Ảnh". */
 export async function shareBlob(blob: Blob, filename: string): Promise<boolean> {
   const file = new File([blob], filename, { type: blob.type });
