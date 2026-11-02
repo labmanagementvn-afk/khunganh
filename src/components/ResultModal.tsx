@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Icon } from './Icon';
-import { canShareFiles, downloadBlob, shareBlob } from '../lib/share';
+import { downloadBlob, shareBlob } from '../lib/share';
 
 interface Props {
   blob: Blob;
@@ -15,7 +15,15 @@ const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(naviga
 export function ResultModal({ blob, filename, status, onClose, extraAction }: Props) {
   const [url, setUrl] = useState('');
   const [shareError, setShareError] = useState('');
-  const shareable = useMemo(canShareFiles, []);
+  const isVideo = blob.type.startsWith('video/');
+  // Kiểm tra với đúng file sẽ chia sẻ (một số máy chia sẻ được ảnh nhưng không chia sẻ được video)
+  const shareable = useMemo(() => {
+    try {
+      return typeof navigator.canShare === 'function' && navigator.canShare({ files: [new File([blob], filename, { type: blob.type })] });
+    } catch {
+      return false;
+    }
+  }, [blob, filename]);
   useEffect(() => {
     const u = URL.createObjectURL(blob);
     setUrl(u);
@@ -26,12 +34,17 @@ export function ResultModal({ blob, filename, status, onClose, extraAction }: Pr
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>Ảnh đã tạo</h2>
+          <h2>{isVideo ? 'Video đã tạo' : 'Ảnh đã tạo'}</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Đóng">
             <Icon name="x" size={20} />
           </button>
         </div>
-        {url && <img className="result-img" src={url} alt="Ảnh kết quả" />}
+        {url &&
+          (isVideo ? (
+            <video className="result-img" src={url} controls playsInline autoPlay muted loop />
+          ) : (
+            <img className="result-img" src={url} alt="Ảnh kết quả" />
+          ))}
         {status && <p className="hint center-text">{status}</p>}
         <div className="modal-actions">
           {shareable && (
@@ -49,9 +62,13 @@ export function ResultModal({ blob, filename, status, onClose, extraAction }: Pr
         </div>
         {shareError && <p className="error">{shareError}</p>}
         <p className="hint">
-          {isIOS
-            ? `iPhone: ${shareable ? 'nhấn "Lưu vào Ảnh / Chia sẻ" rồi chọn "Lưu hình ảnh", hoặc ' : ''}nhấn giữ ảnh phía trên → "Thêm vào Ảnh".`
-            : 'Điện thoại: nhấn "Tải về" (ảnh nằm trong thư mục Tải xuống) hoặc nhấn giữ ảnh phía trên để lưu vào Thư viện ảnh.'}
+          {isVideo
+            ? isIOS
+              ? 'iPhone: nhấn "Lưu vào Ảnh / Chia sẻ" rồi chọn "Lưu video".'
+              : 'Nhấn "Lưu vào Ảnh / Chia sẻ" hoặc "Tải về" – video nằm trong thư mục Tải xuống / Thư viện.'
+            : isIOS
+              ? `iPhone: ${shareable ? 'nhấn "Lưu vào Ảnh / Chia sẻ" rồi chọn "Lưu hình ảnh", hoặc ' : ''}nhấn giữ ảnh phía trên → "Thêm vào Ảnh".`
+              : 'Điện thoại: nhấn "Tải về" (ảnh nằm trong thư mục Tải xuống) hoặc nhấn giữ ảnh phía trên để lưu vào Thư viện ảnh.'}
         </p>
       </div>
     </div>

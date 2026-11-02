@@ -59,6 +59,7 @@ export default function HomePage() {
         <div className="action-grid">
           <ActionTile icon="frame" title="Dùng khung mẫu" text="20 mẫu cho mọi ngành hàng" onClick={() => scrollTo('presets')} />
           <ActionTile icon="grid" title="Ghép ảnh" text="2–6 ảnh, nhiều bố cục" to="/collage" />
+          <ActionTile icon="video" title="Video có khung" text="Chèn khung, chữ, logo vào video" to="/video" />
           <ActionTile icon="plus" title="Tự tạo khung" text="Tải khung của riêng bạn" to="/templates/new" />
         </div>
       </section>

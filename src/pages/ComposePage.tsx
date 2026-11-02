@@ -385,6 +385,9 @@ export default function ComposePage() {
     <div className="page editor">
       <div className="toolbar">
         <h1 className="grow ellipsis">{tpl.name}</h1>
+        <Link className="btn ghost sm" to={`/video?t=${tpl.id}`} title="Dùng khung này cho video">
+          <Icon name="video" /> Video
+        </Link>
         <Link className="btn ghost sm" to={`/batch/${tpl.id}`} title="Chọn nhiều ảnh, tạo nhiều kết quả cùng lúc">
           <Icon name="layers" /> Hàng loạt
         </Link>
