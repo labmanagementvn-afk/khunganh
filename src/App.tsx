@@ -11,6 +11,7 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import PublicTemplatePage from './pages/PublicTemplatePage';
 import TemplateEditorPage from './pages/TemplateEditorPage';
+import VideoPage from './pages/VideoPage';
 
 /** Trang cấp cao nhất – hiện thanh điều hướng dưới đáy trên điện thoại */
 const TOP_LEVEL = ['/', '/feed', '/collage', '/account'];
@@ -93,6 +94,7 @@ export default function App() {
           <Route path="/compose/:id" element={<Shell><ComposePage /></Shell>} />
           <Route path="/batch/:id" element={<Shell><BatchPage /></Shell>} />
           <Route path="/collage" element={<Shell><CollagePage /></Shell>} />
+          <Route path="/video" element={<Shell><VideoPage /></Shell>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </HashRouter>
