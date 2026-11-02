@@ -376,3 +376,38 @@ input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--primary)
 .video-bar { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 4px 10px 4px 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
 .action-grid { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 640px) { .action-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---------- Timeline video (kiểu CapCut) ---------- */
+.timeline { margin-top: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 6px 8px 8px; }
+.tl-head { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; }
+.tl-time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.tl-scroll { overflow-x: auto; overflow-y: hidden; border-radius: 8px; background: #f1efe9; scrollbar-width: thin; }
+.tl-inner { position: relative; min-height: 64px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.tl-ruler { position: relative; height: 22px; border-bottom: 1px solid var(--border); cursor: ew-resize; }
+.tl-tick { position: absolute; top: 3px; font-size: 0.66rem; color: var(--muted); padding-left: 3px; border-left: 1px solid #cfcbc2; line-height: 16px; white-space: nowrap; }
+.tl-track { position: relative; height: 34px; border-bottom: 1px solid #e6e3dc; }
+.tl-bar, .tl-trim {
+  position: absolute; top: 4px; bottom: 4px; display: flex; align-items: center; border-radius: 7px; overflow: hidden;
+  background: #ffffff; border: 1.5px solid #cfcbc2; color: var(--text); font-size: 0.72rem; font-weight: 600; cursor: grab; touch-action: none;
+}
+.tl-bar.on { border-color: var(--accent); background: #fff4ef; box-shadow: 0 0 0 2px rgba(228, 87, 46, 0.18); }
+.tl-label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.tl-handle { flex: none; width: 12px; align-self: stretch; background: #e5e2db; cursor: ew-resize; position: relative; }
+.tl-handle::after { content: ''; position: absolute; left: 5px; top: 30%; bottom: 30%; width: 2px; border-radius: 1px; background: #8f8b82; }
+.tl-bar.on .tl-handle { background: var(--accent); }
+.tl-bar.on .tl-handle::after { background: #fff; }
+.tl-track.video { height: 40px; }
+.tl-video { position: absolute; inset: 4px 0; border-radius: 6px; background: repeating-linear-gradient(90deg, #2b2b2e 0 18px, #3a3a3e 18px 36px); }
+.tl-cut { position: absolute; top: 4px; bottom: 4px; background: rgba(245, 244, 240, 0.78); pointer-events: none; }
+.tl-trim { background: transparent; border: 2px solid #f5c542; color: #fff; }
+.tl-trim .tl-handle { background: #f5c542; }
+.tl-trim .tl-handle::after { background: #6b5a1a; }
+.tl-playhead { position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: var(--accent); pointer-events: none; z-index: 2; }
+.tl-playhead::before { content: ''; position: absolute; top: 0; left: -5px; border: 6px solid transparent; border-top-color: var(--accent); }
+.time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* Màn hình cảm ứng: tay cầm rộng hơn cho ngón tay */
+@media (pointer: coarse) {
+  .tl-handle { width: 18px; }
+  .tl-handle::after { left: 8px; }
+  .tl-bar { min-width: 44px; }
+}
