@@ -56,7 +56,7 @@ không đăng nhập Google, dữ liệu lưu trong trình duyệt (IndexedDB).
    firebase deploy             # deploy Hosting + Firestore rules
    ```
 
-   App sẽ chạy tại `https://<project-id>.web.app`. Mở trên điện thoại và có thể “Thêm vào màn hình chính” để dùng như app.
+   App sẽ chạy tại https://khunganh.web.app (site `khunganh` khai báo trong `firebase.json`; đổi tên site ở đó nếu dùng site khác). Mở trên điện thoại và có thể “Thêm vào màn hình chính” để dùng như app.
 
 > Nếu deploy lên tên miền khác (Vercel, Netlify, GitHub Pages…), thêm tên miền đó vào
 > **Authentication → Settings → Authorized domains**.
@@ -76,7 +76,7 @@ hoặc chạy tay ở tab **Actions → Deploy to Firebase → Run workflow**. C
    Bấm vào tài khoản vừa tạo → **Keys → Add key → Create new key → JSON** → tải file về.
 3. Trong GitHub: **Settings → Secrets and variables → Actions → tab Secrets → New repository secret**,
    tên `FIREBASE_SERVICE_ACCOUNT`, dán **toàn bộ nội dung file JSON** vào. Sau đó xoá file JSON khỏi máy.
-4. Vào tab **Actions → Deploy to Firebase → Run workflow**. Khi xong, app chạy tại `https://<project-id>.web.app`.
+4. Vào tab **Actions → Deploy to Firebase → Run workflow**. Khi xong, app chạy tại https://khunganh.web.app.
 
 ### Lưu trữ ảnh
 
@@ -90,7 +90,7 @@ Mỗi tài khoản vì vậy chỉ chiếm khoảng 1 MB cho lịch sử, cộng
 ### Chia sẻ mẫu & Bảng tin
 
 Người dùng đã đăng nhập có thể chia sẻ khung của mình (nút chia sẻ ở “Khung của tôi”): khung xuất hiện trên
-**Bảng tin** và có link riêng dạng `https://<project-id>.web.app/#/t/<mã>`. Ai mở Bảng tin hoặc link – kể cả
+**Bảng tin** và có link riêng dạng `https://khunganh.web.app/#/t/<mã>`. Ai mở Bảng tin hoặc link – kể cả
 chưa đăng nhập – đều xem và dùng được mẫu; khi dùng, mẫu được sao chép sang kho của người đó nên khung gốc
 không bị thay đổi. Quy tắc bảo mật trong `firestore.rules` chỉ cho chủ mẫu sửa / ngừng chia sẻ.
 
