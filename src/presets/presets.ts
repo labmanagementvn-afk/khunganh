@@ -1,6 +1,7 @@
 import type { PhotoSlot, TextElement } from '../types';
 import { MINIMAL_PRESETS } from './presetsMinimal';
 import { PROMO_PRESETS } from './presetsPromo';
+import { STYLE_PRESETS } from './presetsStyle';
 import { arch, circle, frameSvg, leaf, roundRect, sparkle } from './svg';
 import { fixed, input } from './text';
 
@@ -15,6 +16,8 @@ export const PRESET_CATEGORIES = [
   'Mẹ & bé',
   'Sức khoẻ',
   'Du lịch',
+  'Giáo dục',
+  'Sự kiện',
 ] as const;
 export type PresetCategory = (typeof PRESET_CATEGORIES)[number];
 
@@ -481,4 +484,5 @@ export const PRESETS: Preset[] = [
   techNeon,
   ...MINIMAL_PRESETS,
   ...PROMO_PRESETS,
+  ...STYLE_PRESETS,
 ];
