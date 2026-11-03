@@ -57,7 +57,7 @@ export default function HomePage() {
         <h1>Ảnh sản phẩm đẹp trong vài giây</h1>
         <p className="muted">Chọn khung, thêm ảnh và mã sản phẩm – xuất ảnh và lưu thẳng vào điện thoại.</p>
         <div className="action-grid">
-          <ActionTile icon="frame" title="Dùng khung mẫu" text="40 mẫu cho mọi ngành hàng" onClick={() => scrollTo('presets')} />
+          <ActionTile icon="frame" title="Dùng khung mẫu" text="60 mẫu cho mọi ngành hàng" onClick={() => scrollTo('presets')} />
           <ActionTile icon="grid" title="Ghép ảnh" text="2–6 ảnh, nhiều bố cục" to="/collage" />
           <ActionTile icon="video" title="Video có khung" text="Chèn khung, chữ, logo vào video" to="/video" />
           <ActionTile icon="plus" title="Tự tạo khung" text="Tải khung của riêng bạn" to="/templates/new" />
