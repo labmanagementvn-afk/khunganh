@@ -66,8 +66,20 @@ export function pickRecorderMime(): string | null {
 export const canExportVideo = () =>
   pickRecorderMime() !== null && typeof HTMLCanvasElement !== 'undefined' && 'captureStream' in HTMLCanvasElement.prototype;
 
+/**
+ * Kích thước video xuất: cạnh ngắn bằng `shortSide` (phóng to cả khung nhỏ – chữ và hình vẽ lại ở độ phân giải mới nên
+ * vẫn nét), kích thước chẵn để bộ mã hoá H.264 không từ chối.
+ */
+export function outputSize(width: number, height: number, shortSide: number) {
+  const s = shortSide / Math.min(width, height);
+  return { W: Math.round((width * s) / 2) * 2, H: Math.round((height * s) / 2) * 2 };
+}
+
+/** Bitrate theo số điểm ảnh (~0,3 bit/điểm ảnh/khung hình ở 30 fps): 1080×1080 ≈ 10 Mbps, 1080×1920 ≈ 19 Mbps */
+export const videoBitrate = (W: number, H: number) => Math.round(Math.min(50_000_000, Math.max(6_000_000, W * H * 30 * 0.3)));
+
 /** Vẽ lớp nằm dưới video (nền, khung nếu video đè lên khung), lớp trên (khung, chữ của khung) và từng lớp chèn */
-function renderLayers(scene: VideoScene, scale: number) {
+export function renderLayers(scene: VideoScene, scale: number) {
   const make = (draw: (layer: Konva.Layer) => void) => {
     const stage = new Konva.Stage({
       container: document.createElement('div'),
@@ -137,7 +149,7 @@ export interface RecordOptions {
   placement: VideoPlacement;
   start: number;
   end: number;
-  /** Độ phân giải theo cạnh ngắn (1080 = 1080p, 720 = 720p); không vượt kích thước gốc của khung */
+  /** Độ phân giải theo cạnh ngắn (1440 = 2K, 1080 = 1080p, 720 = 720p) */
   shortSide: number;
   withAudio: boolean;
   /** Nguồn âm thanh của thẻ video (chỉ tạo được 1 lần cho mỗi thẻ video) */
@@ -151,10 +163,8 @@ export async function recordComposite(o: RecordOptions): Promise<Blob> {
   const mime = pickRecorderMime();
   if (!mime) throw new Error('Trình duyệt này không hỗ trợ xuất video. Hãy thử Chrome hoặc Safari mới.');
   const { scene, video, placement: pl } = o;
-  // Kích thước chẵn để bộ mã hoá H.264 không từ chối
-  const s = Math.min(1, o.shortSide / Math.min(scene.width, scene.height));
-  const W = Math.round((scene.width * s) / 2) * 2;
-  const H = Math.round((scene.height * s) / 2) * 2;
+  // Ghi theo thời gian thực nặng hơn nhiều → tối đa 1080p
+  const { W, H } = outputSize(scene.width, scene.height, Math.min(1080, o.shortSide));
   const { under, over, overlays } = renderLayers(scene, W / scene.width);
 
   const canvas = document.createElement('canvas');
@@ -163,6 +173,7 @@ export async function recordComposite(o: RecordOptions): Promise<Blob> {
   canvas.style.cssText = 'position:fixed;left:-99999px;top:0;opacity:0;pointer-events:none';
   document.body.appendChild(canvas);
   const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingQuality = 'high';
   const k = W / scene.width;
 
   const draw = () => {
@@ -193,7 +204,7 @@ export async function recordComposite(o: RecordOptions): Promise<Blob> {
       dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
     }
   }
-  const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: Math.min(W, H) >= 1000 ? 8_000_000 : 5_000_000 });
+  const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: videoBitrate(W, H) });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   const done = new Promise<void>((resolve) => (recorder.onstop = () => resolve()));

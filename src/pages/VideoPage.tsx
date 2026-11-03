@@ -17,7 +17,8 @@ import { slotClip } from '../lib/geometry';
 import { newId } from '../lib/id';
 import { blobToImage, prepareImageFile } from '../lib/image';
 import { CANVAS_UI } from '../lib/theme';
-import { canExportVideo, recordComposite, type Overlay, type VideoPlacement } from '../lib/videoCompose';
+import { canExportVideo, outputSize, recordComposite, type Overlay, type VideoPlacement } from '../lib/videoCompose';
+import { CancelledError, canEncodeOffline, encodeComposite } from '../lib/videoEncode';
 import { disposeVideo, loadVideoFile } from '../lib/videoLoad';
 import type { PhotoSlot, Template, TextElement } from '../types';
 
@@ -52,7 +53,7 @@ export default function VideoPage() {
   const [aspect, setAspect] = useState<AspectId>('video');
   const [background, setBackground] = useState('#000000');
 
-  const [video, setVideo] = useState<{ el: HTMLVideoElement; url: string; name: string } | null>(null);
+  const [video, setVideo] = useState<{ el: HTMLVideoElement; url: string; name: string; file: File } | null>(null);
   const [loadingVideo, setLoadingVideo] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [trim, setTrim] = useState({ start: 0, end: 0 });
@@ -80,7 +81,9 @@ export default function VideoPage() {
   overlaysRef.current = overlays;
   const trimRef = useRef(trim);
   trimRef.current = trim;
-  const supported = useMemo(canExportVideo, []);
+  const supported = useMemo(() => canExportVideo() || canEncodeOffline(), []);
+  /** Cách xuất đang chạy: 'offline' (WebCodecs, chạy được khi chuyển tab) hoặc 'realtime' (phát và ghi lại) */
+  const [exportMode, setExportMode] = useState<'offline' | 'realtime'>('offline');
 
   useEffect(() => {
     store.listTemplates(uid).then(setTemplates).catch(() => {});
@@ -120,7 +123,7 @@ export default function VideoPage() {
   const vw = video?.el.videoWidth || 1080;
   const vh = video?.el.videoHeight || 1350;
   const preset = ASPECTS.find((a) => a.id === aspect)!;
-  const k = 1080 / Math.max(vw, vh); // "Theo video": giữ tỉ lệ, cạnh dài 1080px
+  const k = 1080 / Math.min(vw, vh); // "Theo video": giữ tỉ lệ, cạnh ngắn 1080px (video dọc → 1080×1920)
   const W = tpl ? tpl.width : 'w' in preset ? preset.w : Math.round(vw * k);
   const H = tpl ? tpl.height : 'h' in preset ? preset.h : Math.round(vh * k);
   const slot: PhotoSlot = tpl ? tpl.photoSlot : { x: 0, y: 0, width: W, height: H, radius: 0 };
@@ -211,7 +214,7 @@ export default function VideoPage() {
       audioRef.current = null;
       const dur = isFinite(el.duration) ? el.duration : 0;
       setTrim({ start: 0, end: dur });
-      setVideo({ el, url, name: file.name.replace(/\.[^.]+$/, '') });
+      setVideo({ el, url, name: file.name.replace(/\.[^.]+$/, ''), file });
       // Lớp đã chèn trước đó: giữ trong độ dài video mới
       setOverlays((xs) => xs.map((o) => ({ ...o, start: Math.min(o.start, Math.max(0, dur - 0.5)), end: Math.min(o.end, dur) || dur })));
       setSelected('video');
@@ -293,37 +296,68 @@ export default function VideoPage() {
     exportingRef.current = true;
     cancelRef.current = { cancelled: false };
     setExporting(0);
-    // Bật tiếng ngay trong thao tác bấm nút (iPhone chỉ cho phép phát có tiếng khi người dùng chạm)
+    // Bật tiếng ngay trong thao tác bấm nút (iPhone chỉ cho phép phát có tiếng khi người dùng chạm) – dùng khi phải ghi theo thời gian thực
     if (withAudio) el.muted = false;
+    el.pause();
+    const wake = await requestWakeLock();
+    const scene = { width: W, height: H, background: bg, slot, template: tpl, frameImg, values, overlays };
+    const end = trim.end || el.duration;
     try {
-      const blob = await recordComposite({
-        scene: { width: W, height: H, background: bg, slot, template: tpl, frameImg, values, overlays },
-        video: el,
-        placement,
-        start: trim.start,
-        end: trim.end || el.duration,
-        shortSide: quality,
-        withAudio,
-        audioSource: () => {
-          if (!audioRef.current) {
-            try {
-              const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-              const ctx = new Ctx();
-              audioRef.current = { ctx, node: ctx.createMediaElementSource(el) };
-            } catch {
-              return null;
+      // Ưu tiên giải mã / mã hoá từng khung hình (không phụ thuộc tab đang mở); trình duyệt không hỗ trợ thì ghi thời gian thực
+      setExportMode('offline');
+      let blob: Blob | null = null;
+      try {
+        blob = await encodeComposite({
+          scene,
+          file: video.file,
+          videoWidth: el.videoWidth,
+          videoHeight: el.videoHeight,
+          placement,
+          start: trim.start,
+          end,
+          shortSide: quality,
+          withAudio,
+          onProgress: (f) => setExporting(f),
+          signal: cancelRef.current,
+        });
+      } catch (e) {
+        if (e instanceof CancelledError || cancelRef.current.cancelled) throw e;
+        console.warn('Xuất offline lỗi, chuyển sang ghi thời gian thực', e);
+      }
+      if (!blob) {
+        if (!canExportVideo()) throw new Error('Trình duyệt này không hỗ trợ xuất video. Hãy thử Chrome hoặc Safari mới.');
+        setExportMode('realtime');
+        setExporting(0);
+        blob = await recordComposite({
+          scene,
+          video: el,
+          placement,
+          start: trim.start,
+          end,
+          shortSide: quality,
+          withAudio,
+          audioSource: () => {
+            if (!audioRef.current) {
+              try {
+                const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+                const ctx = new Ctx();
+                audioRef.current = { ctx, node: ctx.createMediaElementSource(el) };
+              } catch {
+                return null;
+              }
             }
-          }
-          return audioRef.current;
-        },
-        onProgress: (f) => setExporting(f),
-        signal: cancelRef.current,
-      });
+            return audioRef.current;
+          },
+          onProgress: (f) => setExporting(f),
+          signal: cancelRef.current,
+        });
+      }
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
       setResult({ blob, name: `${video.name || 'video'}-khung-${Date.now().toString(36)}.${ext}` });
     } catch (e) {
       if (!cancelRef.current.cancelled) setError('Xuất video thất bại: ' + (e as Error).message);
     } finally {
+      wake?.release().catch(() => {});
       exportingRef.current = false;
       setExporting(null);
       el.muted = true;
@@ -336,6 +370,7 @@ export default function VideoPage() {
   const selOverlay = overlays.find((o) => o.id === selected);
   const inputLabels = Object.keys(values);
   const clipLen = Math.max(0, (trim.end || duration) - trim.start);
+  const outSize = outputSize(W, H, quality);
   const timelineItems: TimelineItem[] = overlays.map((o, i) => ({
     id: o.id,
     label: o.kind === 'text' ? o.text.text || 'Chữ' : `Ảnh ${overlays.slice(0, i + 1).filter((x) => x.kind === 'image').length}`,
@@ -687,11 +722,14 @@ export default function VideoPage() {
               <label className="field inline">
                 <span>Chất lượng</span>
                 <select value={quality} onChange={(e) => setQuality(Number(e.target.value))}>
-                  <option value={1080}>Cao (1080p)</option>
+                  <option value={1440}>Rất nét (2K)</option>
+                  <option value={1080}>Nét (1080p)</option>
                   <option value={720}>Nhẹ (720p)</option>
                 </select>
               </label>
-              <p className="hint">Độ dài video xuất: {fmt(clipLen)}</p>
+              <p className="hint">
+                Kích thước {outSize.W}×{outSize.H} · độ dài {fmt(clipLen)}
+              </p>
             </div>
           )}
 
@@ -701,7 +739,14 @@ export default function VideoPage() {
               <div className="progress">
                 <div style={{ width: `${exporting * 100}%` }} />
               </div>
-              <p className="hint">Video được ghi theo thời gian thực (khoảng {fmt(clipLen)}). Giữ màn hình mở, không chuyển ứng dụng.</p>
+              {exportMode === 'offline' ? (
+                <p className="hint">
+                  Bạn có thể chuyển sang tab khác trong lúc chờ. Trên điện thoại, nếu thoát ra ứng dụng khác thì quá trình tạm dừng và tự chạy
+                  tiếp khi quay lại.
+                </p>
+              ) : (
+                <p className="hint">Video được ghi theo thời gian thực (khoảng {fmt(clipLen)}). Giữ màn hình mở, không chuyển tab hay ứng dụng.</p>
+              )}
               <button className="btn" onClick={() => (cancelRef.current.cancelled = true)}>
                 Huỷ
               </button>
@@ -739,4 +784,13 @@ export default function VideoPage() {
       {result && <ResultModal blob={result.blob} filename={result.name} onClose={() => setResult(null)} />}
     </div>
   );
+}
+
+/** Giữ màn hình sáng trong lúc xuất video (nếu trình duyệt hỗ trợ) */
+async function requestWakeLock(): Promise<WakeLockSentinel | null> {
+  try {
+    return (await navigator.wakeLock?.request('screen')) ?? null;
+  } catch {
+    return null;
+  }
 }
