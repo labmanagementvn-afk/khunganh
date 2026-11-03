@@ -7,6 +7,7 @@ import { ResultModal } from '../components/ResultModal';
 import { SettingsPanel } from '../components/SettingsPanel';
 import { TextNode, createTextElement } from '../components/TextNode';
 import { TextPropsPanel } from '../components/TextPropsPanel';
+import { Timeline, type TimelineItem } from '../components/Timeline';
 import { useArrowNudge } from '../components/useArrowNudge';
 import { useFitScale } from '../components/useFitScale';
 import { useSession } from '../lib/auth';
@@ -16,7 +17,8 @@ import { slotClip } from '../lib/geometry';
 import { newId } from '../lib/id';
 import { blobToImage, prepareImageFile } from '../lib/image';
 import { CANVAS_UI } from '../lib/theme';
-import { canExportVideo, recordComposite, type Sticker, type VideoPlacement } from '../lib/videoCompose';
+import { canExportVideo, recordComposite, type Overlay, type VideoPlacement } from '../lib/videoCompose';
+import { disposeVideo, loadVideoFile } from '../lib/videoLoad';
 import type { PhotoSlot, Template, TextElement } from '../types';
 
 const ASPECTS = [
@@ -37,7 +39,7 @@ function coverScale(vw: number, vh: number, rotation: number, w: number, h: numb
   return mode === 'cover' ? Math.max(w / iw, h / ih) : Math.min(w / iw, h / ih);
 }
 
-/** Tạo video có khung: chọn khung (hoặc không), chọn video, thêm chữ / ảnh / logo, xuất video */
+/** Tạo video có khung: chọn khung (hoặc không), chọn video, chèn chữ / ảnh / logo theo timeline, xuất video */
 export default function VideoPage() {
   const { uid, store } = useSession();
   const [params, setParams] = useSearchParams();
@@ -51,12 +53,12 @@ export default function VideoPage() {
   const [background, setBackground] = useState('#000000');
 
   const [video, setVideo] = useState<{ el: HTMLVideoElement; url: string; name: string } | null>(null);
-  const [playing, setPlaying] = useState(true);
-  const [time, setTime] = useState(0);
+  const [loadingVideo, setLoadingVideo] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const [trim, setTrim] = useState({ start: 0, end: 0 });
   const [placement, setPlacement] = useState<VideoPlacement | null>(null);
-  const [stickers, setStickers] = useState<Sticker[]>([]);
-  const [extras, setExtras] = useState<TextElement[]>([]);
+  /** Ảnh / chữ chèn – thứ tự mảng = thứ tự lớp (phần tử sau nằm trên) */
+  const [overlays, setOverlays] = useState<Overlay[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
 
   const [withAudio, setWithAudio] = useState(true);
@@ -74,9 +76,12 @@ export default function VideoPage() {
   const audioRef = useRef<{ ctx: AudioContext; node: MediaElementAudioSourceNode } | null>(null);
   const cancelRef = useRef({ cancelled: false });
   const exportingRef = useRef(false);
+  const overlaysRef = useRef(overlays);
+  overlaysRef.current = overlays;
+  const trimRef = useRef(trim);
+  trimRef.current = trim;
   const supported = useMemo(canExportVideo, []);
 
-  // Danh sách khung của người dùng
   useEffect(() => {
     store.listTemplates(uid).then(setTemplates).catch(() => {});
   }, [store, uid]);
@@ -108,19 +113,22 @@ export default function VideoPage() {
     };
   }, [tplId, store, uid]);
 
+  // Giải phóng video cũ khi đổi video hoặc rời trang
+  useEffect(() => () => void (video && disposeVideo(video)), [video]);
+
   // Kích thước khung hình & vùng đặt video
   const vw = video?.el.videoWidth || 1080;
   const vh = video?.el.videoHeight || 1350;
   const preset = ASPECTS.find((a) => a.id === aspect)!;
-  // "Theo video": giữ tỉ lệ video, cạnh dài 1080px
-  const k = 1080 / Math.max(vw, vh);
+  const k = 1080 / Math.max(vw, vh); // "Theo video": giữ tỉ lệ, cạnh dài 1080px
   const W = tpl ? tpl.width : 'w' in preset ? preset.w : Math.round(vw * k);
   const H = tpl ? tpl.height : 'h' in preset ? preset.h : Math.round(vh * k);
   const slot: PhotoSlot = tpl ? tpl.photoSlot : { x: 0, y: 0, width: W, height: H, radius: 0 };
   const bg = tpl ? tpl.background : background;
+  const duration = video?.el.duration && isFinite(video.el.duration) ? video.el.duration : 0;
 
-  const scale = useFitScale(wrapRef, W, H, 0.55);
-  const fontsVersion = useFontsReady([...(tpl?.texts ?? []), ...extras].map((t) => t.fontFamily));
+  const scale = useFitScale(wrapRef, W, H, 0.5);
+  const fontsVersion = useFontsReady([...(tpl?.texts ?? []), ...overlays.flatMap((o) => (o.kind === 'text' ? [o.text] : []))].map((t) => t.fontFamily));
 
   const fit = (mode: 'cover' | 'contain', rotation = placement?.rotation ?? 0) =>
     video &&
@@ -136,27 +144,35 @@ export default function VideoPage() {
     if (video) fit('cover', 0);
   }, [video, tpl?.id, aspect, W, H]);
 
-  // Vẽ lại liên tục khi video đang phát
+  // Mỗi khung hình: vẽ lại video, ẩn/hiện lớp chèn theo thời gian, phát lặp trong đoạn đã cắt
   useEffect(() => {
     if (!video || !layerRef.current) return;
-    const anim = new Konva.Animation(() => {}, layerRef.current);
+    const el = video.el;
+    const anim = new Konva.Animation(() => {
+      const t = el.currentTime;
+      const tr = trimRef.current;
+      if (!exportingRef.current && !el.paused && tr.end > 0 && t >= tr.end) el.currentTime = tr.start;
+      const stage = stageRef.current;
+      if (!stage) return;
+      for (const o of overlaysRef.current) {
+        const n = stage.findOne('#' + o.id);
+        if (n) n.visible(t >= o.start && t < o.end);
+      }
+      const trNode = trRef.current;
+      if (trNode) trNode.visible(trNode.nodes().every((n) => n.visible()));
+    }, layerRef.current);
     anim.start();
+    setPlaying(!el.paused);
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    el.addEventListener('play', onPlay);
+    el.addEventListener('pause', onPause);
     return () => {
       anim.stop();
+      el.removeEventListener('play', onPlay);
+      el.removeEventListener('pause', onPause);
     };
   }, [video]);
-
-  // Phát lặp trong đoạn đã cắt
-  useEffect(() => {
-    if (!video) return;
-    const el = video.el;
-    const onTime = () => {
-      setTime(el.currentTime);
-      if (!exportingRef.current && trim.end > 0 && el.currentTime >= trim.end) el.currentTime = trim.start;
-    };
-    el.addEventListener('timeupdate', onTime);
-    return () => el.removeEventListener('timeupdate', onTime);
-  }, [video, trim]);
 
   useEffect(() => {
     const tr = trRef.current;
@@ -165,14 +181,23 @@ export default function VideoPage() {
     const node = selected && selected !== 'video' ? stage.findOne('#' + selected) : null;
     tr.nodes(node ? [node] : []);
     tr.getLayer()?.batchDraw();
-  }, [selected, stickers, extras, fontsVersion]);
+  }, [selected, overlays, fontsVersion]);
+
+  const updateOverlay = (id: string, patch: Partial<Overlay>) =>
+    setOverlays((xs) => xs.map((o) => (o.id === id ? ({ ...o, ...patch } as Overlay) : o)));
+  const updateText = (id: string, patch: Partial<TextElement>) =>
+    setOverlays((xs) => xs.map((o) => (o.id === id && o.kind === 'text' ? { ...o, text: { ...o.text, ...patch } } : o)));
 
   useArrowNudge(
     selected
       ? (dx, dy) => {
           if (selected === 'video') setPlacement((p) => (p ? { ...p, cx: p.cx + dx, cy: p.cy + dy } : p));
-          setStickers((xs) => xs.map((s) => (s.id === selected ? { ...s, x: s.x + dx, y: s.y + dy } : s)));
-          setExtras((xs) => xs.map((t) => (t.id === selected ? { ...t, x: t.x + dx, y: t.y + dy } : t)));
+          else
+            setOverlays((xs) =>
+              xs.map((o) =>
+                o.id !== selected ? o : o.kind === 'image' ? { ...o, x: o.x + dx, y: o.y + dy } : { ...o, text: { ...o.text, x: o.text.x + dx, y: o.text.y + dy } },
+              ),
+            );
         }
       : null,
   );
@@ -180,32 +205,28 @@ export default function VideoPage() {
   async function pickVideo(file: File | undefined) {
     if (!file) return;
     setError('');
-    const url = URL.createObjectURL(file);
-    const el = document.createElement('video');
-    el.src = url;
-    el.muted = true;
-    el.playsInline = true;
-    el.loop = true;
-    el.preload = 'auto';
+    setLoadingVideo(true);
     try {
-      await new Promise<void>((resolve, reject) => {
-        el.onloadeddata = () => resolve();
-        el.onerror = () => reject(new Error('Không đọc được video này. Hãy thử video MP4 hoặc quay lại bằng điện thoại.'));
-      });
+      const { el, url } = await loadVideoFile(file);
+      audioRef.current = null;
+      const dur = isFinite(el.duration) ? el.duration : 0;
+      setTrim({ start: 0, end: dur });
+      setVideo({ el, url, name: file.name.replace(/\.[^.]+$/, '') });
+      // Lớp đã chèn trước đó: giữ trong độ dài video mới
+      setOverlays((xs) => xs.map((o) => ({ ...o, start: Math.min(o.start, Math.max(0, dur - 0.5)), end: Math.min(o.end, dur) || dur })));
+      setSelected('video');
     } catch (e) {
       setError((e as Error).message);
-      URL.revokeObjectURL(url);
-      return;
+    } finally {
+      setLoadingVideo(false);
     }
-    if (video) {
-      video.el.pause();
-      URL.revokeObjectURL(video.url);
-    }
-    audioRef.current = null;
-    setTrim({ start: 0, end: el.duration || 0 });
-    setVideo({ el, url, name: file.name.replace(/\.[^.]+$/, '') });
-    setSelected('video');
-    el.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  }
+
+  /** Thời gian mặc định cho lớp mới: từ vạch phát tới hết đoạn (ảnh) hoặc 3 giây (chữ) */
+  function defaultTiming(kind: Overlay['kind']) {
+    const t = video?.el.currentTime ?? 0;
+    const start = t >= trim.start && t < trim.end - 0.5 ? t : trim.start;
+    return { start, end: kind === 'image' ? trim.end || duration : Math.min(start + 3, trim.end || duration) };
   }
 
   async function addStickers(files: FileList | null) {
@@ -214,9 +235,9 @@ export default function VideoPage() {
       const { img } = await prepareImageFile(f, 1600, true);
       const w = Math.round(W * 0.3);
       const h = Math.round((w * img.naturalHeight) / img.naturalWidth);
-      const s: Sticker = { id: newId(), img, x: Math.round((W - w) / 2), y: Math.round(H * 0.06), width: w, height: h, rotation: 0 };
-      setStickers((xs) => [...xs, s]);
-      setSelected(s.id);
+      const o: Overlay = { kind: 'image', id: newId(), img, x: Math.round((W - w) / 2), y: Math.round(H * 0.06), width: w, height: h, rotation: 0, ...defaultTiming('image') };
+      setOverlays((xs) => [...xs, o]);
+      setSelected(o.id);
     }
   }
 
@@ -226,17 +247,42 @@ export default function VideoPage() {
     el.fill = '#ffffff';
     el.stroke = '#000000';
     el.strokeWidth = Math.round(el.fontSize / 12);
-    setExtras((xs) => [...xs, el]);
+    setOverlays((xs) => [...xs, { kind: 'text', id: el.id, text: el, ...defaultTiming('text') }]);
     setSelected(el.id);
+  }
+
+  function seek(t: number) {
+    if (!video) return;
+    if (!video.el.paused) video.el.pause();
+    video.el.currentTime = t;
   }
 
   function togglePlay() {
     if (!video) return;
-    if (video.el.paused) video.el.play().then(() => setPlaying(true)).catch(() => {});
-    else {
-      video.el.pause();
-      setPlaying(false);
-    }
+    const el = video.el;
+    if (el.paused) {
+      if (el.currentTime < trim.start || el.currentTime >= trim.end - 0.05) el.currentTime = trim.start;
+      el.play().catch(() => {});
+    } else el.pause();
+  }
+
+  /** Chọn lớp từ timeline: tua tới lúc lớp đang hiện để thấy và chỉnh ngay */
+  function selectFromTimeline(id: string) {
+    setSelected(id);
+    const o = overlays.find((x) => x.id === id);
+    const t = video?.el.currentTime ?? 0;
+    if (o && video && (t < o.start || t >= o.end)) seek(o.start + 0.01);
+  }
+
+  function moveLayer(id: string, dir: 1 | -1) {
+    setOverlays((xs) => {
+      const i = xs.findIndex((o) => o.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= xs.length) return xs;
+      const next = [...xs];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
   }
 
   async function exportVideo() {
@@ -251,7 +297,7 @@ export default function VideoPage() {
     if (withAudio) el.muted = false;
     try {
       const blob = await recordComposite({
-        scene: { width: W, height: H, background: bg, slot, template: tpl, frameImg, values, extras, stickers },
+        scene: { width: W, height: H, background: bg, slot, template: tpl, frameImg, values, overlays },
         video: el,
         placement,
         start: trim.start,
@@ -283,15 +329,20 @@ export default function VideoPage() {
       el.muted = true;
       el.loop = true;
       el.currentTime = trim.start;
-      el.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+      el.pause();
     }
   }
 
-  const selSticker = stickers.find((s) => s.id === selected);
-  const selText = extras.find((t) => t.id === selected);
+  const selOverlay = overlays.find((o) => o.id === selected);
   const inputLabels = Object.keys(values);
-  const duration = video?.el.duration || 0;
   const clipLen = Math.max(0, (trim.end || duration) - trim.start);
+  const timelineItems: TimelineItem[] = overlays.map((o, i) => ({
+    id: o.id,
+    label: o.kind === 'text' ? o.text.text || 'Chữ' : `Ảnh ${overlays.slice(0, i + 1).filter((x) => x.kind === 'image').length}`,
+    icon: o.kind === 'text' ? 'type' : 'image',
+    start: o.start,
+    end: o.end,
+  }));
 
   const videoNode = video && placement && (
     <Group key="video" clipFunc={(ctx) => slotClip(ctx, slot)}>
@@ -320,14 +371,12 @@ export default function VideoPage() {
     <div className="page editor">
       <div className="toolbar">
         <h1 className="grow">Video có khung</h1>
-        <button className="btn" onClick={() => videoInput.current?.click()} disabled={exporting !== null}>
+        <button className="btn" onClick={() => videoInput.current?.click()} disabled={exporting !== null || loadingVideo}>
           <Icon name="replace" /> {video ? 'Đổi video' : 'Chọn video'}
         </button>
       </div>
       {!supported && (
-        <p className="error">
-          Trình duyệt này chưa hỗ trợ xuất video. Hãy mở bằng Safari (iPhone, iOS 14.5+) hoặc Chrome bản mới.
-        </p>
+        <p className="error">Trình duyệt này chưa hỗ trợ xuất video. Hãy mở bằng Safari (iPhone, iOS 14.5+) hoặc Chrome bản mới.</p>
       )}
       {error && <p className="error">{error}</p>}
 
@@ -358,7 +407,7 @@ export default function VideoPage() {
                       y={slot.y + slot.height / 2 - 14 / scale}
                       width={slot.width}
                       align="center"
-                      text="Chạm để chọn video"
+                      text={loadingVideo ? 'Đang mở video…' : 'Chạm để chọn video'}
                       fontSize={22 / scale}
                       fontStyle="bold"
                       fill={CANVAS_UI.placeholderText}
@@ -370,42 +419,43 @@ export default function VideoPage() {
                   const v = t.kind === 'input' ? values[labelOf(t)] ?? '' : t.text;
                   return v ? <TextNode key={t.id + fontsVersion} el={t} value={v} interactive={false} /> : null;
                 })}
-                {stickers.map((s) => (
-                  <KImage
-                    key={s.id}
-                    id={s.id}
-                    image={s.img}
-                    x={s.x}
-                    y={s.y}
-                    width={s.width}
-                    height={s.height}
-                    rotation={s.rotation}
-                    draggable
-                    onMouseDown={() => setSelected(s.id)}
-                    onTouchStart={() => setSelected(s.id)}
-                    onDragEnd={(e) => setStickers((xs) => xs.map((x) => (x.id === s.id ? { ...x, x: e.target.x(), y: e.target.y() } : x)))}
-                    onTransformEnd={(e) => {
-                      const n = e.target;
-                      const patch = { x: n.x(), y: n.y(), rotation: n.rotation(), width: n.width() * n.scaleX(), height: n.height() * n.scaleY() };
-                      n.scaleX(1);
-                      n.scaleY(1);
-                      setStickers((xs) => xs.map((x) => (x.id === s.id ? { ...x, ...patch } : x)));
-                    }}
-                  />
-                ))}
-                {extras.map((t) => (
-                  <TextNode
-                    key={t.id + fontsVersion}
-                    el={t}
-                    value={t.text}
-                    interactive
-                    onSelect={() => setSelected(t.id)}
-                    onChange={(p) => setExtras((xs) => xs.map((x) => (x.id === t.id ? { ...x, ...p } : x)))}
-                  />
-                ))}
+                {overlays.map((o) =>
+                  o.kind === 'image' ? (
+                    <KImage
+                      key={o.id}
+                      id={o.id}
+                      image={o.img}
+                      x={o.x}
+                      y={o.y}
+                      width={o.width}
+                      height={o.height}
+                      rotation={o.rotation}
+                      draggable
+                      onMouseDown={() => setSelected(o.id)}
+                      onTouchStart={() => setSelected(o.id)}
+                      onDragEnd={(e) => updateOverlay(o.id, { x: e.target.x(), y: e.target.y() })}
+                      onTransformEnd={(e) => {
+                        const n = e.target;
+                        const patch = { x: n.x(), y: n.y(), rotation: n.rotation(), width: n.width() * n.scaleX(), height: n.height() * n.scaleY() };
+                        n.scaleX(1);
+                        n.scaleY(1);
+                        updateOverlay(o.id, patch);
+                      }}
+                    />
+                  ) : (
+                    <TextNode
+                      key={o.id + fontsVersion}
+                      el={o.text}
+                      value={o.text.text}
+                      interactive
+                      onSelect={() => setSelected(o.id)}
+                      onChange={(p) => updateText(o.id, p)}
+                    />
+                  ),
+                )}
                 <Transformer
                   ref={trRef}
-                  keepRatio={!!selSticker}
+                  keepRatio={selOverlay?.kind === 'image'}
                   anchorSize={14}
                   anchorCornerRadius={4}
                   borderStroke={CANVAS_UI.accent}
@@ -416,35 +466,35 @@ export default function VideoPage() {
           </div>
 
           {video && (
-            <div className="video-bar">
-              <button className="icon-btn" onClick={togglePlay} aria-label={playing ? 'Tạm dừng' : 'Phát'} disabled={exporting !== null}>
-                <Icon name={playing ? 'pause' : 'play'} size={20} />
-              </button>
-              <span className="muted small-text">
-                {fmt(time)} / {fmt(duration)}
-              </span>
-              <span className="grow" />
-              <span className="muted small-text">Đoạn xuất: {fmt(clipLen)}</span>
-            </div>
+            <>
+              <div className="video-bar">
+                <button className="btn primary sm" onClick={togglePlay} disabled={exporting !== null}>
+                  <Icon name={playing ? 'pause' : 'play'} /> {playing ? 'Tạm dừng' : 'Phát'}
+                </button>
+                <span className="grow" />
+                <button className="btn sm" onClick={() => stickerInput.current?.click()} disabled={exporting !== null}>
+                  <Icon name="image" /> Ảnh
+                </button>
+                <button className="btn sm" onClick={addText} disabled={exporting !== null}>
+                  <Icon name="type" /> Chữ
+                </button>
+              </div>
+              <Timeline
+                duration={duration}
+                trim={{ start: trim.start, end: trim.end || duration }}
+                onTrim={(t) => {
+                  setTrim(t);
+                  seek(t.start);
+                }}
+                items={timelineItems}
+                selected={selected}
+                onSelect={selectFromTimeline}
+                onChange={(id, t) => updateOverlay(id, t)}
+                getTime={() => video.el.currentTime}
+                onSeek={seek}
+              />
+            </>
           )}
-
-          <div className="chips">
-            {video && (
-              <button className={selected === 'video' ? 'chip on' : 'chip'} onClick={() => setSelected('video')}>
-                <Icon name="video" size={15} /> Video
-              </button>
-            )}
-            {stickers.map((s, i) => (
-              <button key={s.id} className={selected === s.id ? 'chip on' : 'chip'} onClick={() => setSelected(s.id)}>
-                <Icon name="image" size={15} /> Ảnh {i + 1}
-              </button>
-            ))}
-            {extras.map((t) => (
-              <button key={t.id} className={selected === t.id ? 'chip on' : 'chip'} onClick={() => setSelected(t.id)}>
-                <Icon name="type" size={15} /> {t.text.slice(0, 14) || 'Chữ'}
-              </button>
-            ))}
-          </div>
 
           {selected === 'video' && video && placement ? (
             <SettingsPanel title="Video" onClose={() => setSelected(null)}>
@@ -470,51 +520,102 @@ export default function VideoPage() {
                   <Icon name="rotate" /> Xoay 90°
                 </button>
               </div>
-              <p className="hint">Kéo video để chỉnh vị trí trong khung.</p>
+              <p className="hint">Kéo video để chỉnh vị trí. Cắt đầu / cuối video bằng hai mép thanh “Video” trên timeline.</p>
             </SettingsPanel>
-          ) : selSticker ? (
-            <SettingsPanel title="Ảnh chèn" onClose={() => setSelected(null)}>
-              <p className="hint">Kéo để di chuyển, kéo góc để đổi kích thước hoặc xoay.</p>
+          ) : selOverlay ? (
+            <SettingsPanel title={selOverlay.kind === 'text' ? selOverlay.text.text || 'Chữ' : 'Ảnh chèn'} onClose={() => setSelected(null)}>
+              <div className="time-row">
+                <label className="field">
+                  <span>Hiện từ (giây)</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step={0.1}
+                    min={0}
+                    value={Number(selOverlay.start.toFixed(1))}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (!isNaN(v)) updateOverlay(selOverlay.id, { start: Math.max(0, Math.min(v, selOverlay.end - 0.3)) });
+                    }}
+                  />
+                </label>
+                <label className="field">
+                  <span>Đến (giây)</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step={0.1}
+                    min={0}
+                    value={Number(selOverlay.end.toFixed(1))}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (!isNaN(v)) updateOverlay(selOverlay.id, { end: Math.min(duration, Math.max(v, selOverlay.start + 0.3)) });
+                    }}
+                  />
+                </label>
+              </div>
               <div className="row wrap">
+                <button className="btn ghost sm" onClick={() => updateOverlay(selOverlay.id, { start: trim.start, end: trim.end || duration })}>
+                  Toàn bộ đoạn
+                </button>
                 <button
                   className="btn ghost sm"
-                  onClick={() => setStickers((xs) => xs.map((s) => (s.id === selSticker.id ? { ...s, x: Math.round((W - s.width) / 2) } : s)))}
+                  onClick={() => updateOverlay(selOverlay.id, { start: Math.min(video?.el.currentTime ?? 0, selOverlay.end - 0.3) })}
                 >
-                  <Icon name="center" /> Căn giữa ngang
+                  Bắt đầu ở đây
                 </button>
+                <button
+                  className="btn ghost sm"
+                  onClick={() => updateOverlay(selOverlay.id, { end: Math.max(video?.el.currentTime ?? 0, selOverlay.start + 0.3) })}
+                >
+                  Kết thúc ở đây
+                </button>
+              </div>
+              <div className="row wrap">
+                <button className="btn ghost sm" onClick={() => moveLayer(selOverlay.id, 1)} disabled={overlays[overlays.length - 1]?.id === selOverlay.id}>
+                  Đưa lên trên
+                </button>
+                <button className="btn ghost sm" onClick={() => moveLayer(selOverlay.id, -1)} disabled={overlays[0]?.id === selOverlay.id}>
+                  Đưa xuống dưới
+                </button>
+                {selOverlay.kind === 'image' && (
+                  <button className="btn ghost sm" onClick={() => updateOverlay(selOverlay.id, { x: Math.round((W - selOverlay.width) / 2) })}>
+                    <Icon name="center" /> Căn giữa
+                  </button>
+                )}
+              </div>
+              {selOverlay.kind === 'text' ? (
+                <TextPropsPanel
+                  el={selOverlay.text}
+                  canvasWidth={W}
+                  allowKind={false}
+                  onChange={(p) => updateText(selOverlay.id, p)}
+                  onDelete={() => {
+                    setOverlays((xs) => xs.filter((x) => x.id !== selOverlay.id));
+                    setSelected(null);
+                  }}
+                />
+              ) : (
                 <button
                   className="btn danger sm"
                   onClick={() => {
-                    setStickers((xs) => xs.filter((s) => s.id !== selSticker.id));
+                    setOverlays((xs) => xs.filter((x) => x.id !== selOverlay.id));
                     setSelected(null);
                   }}
                 >
                   <Icon name="trash" /> Xoá ảnh
                 </button>
-              </div>
-            </SettingsPanel>
-          ) : selText ? (
-            <SettingsPanel title={selText.text || 'Chữ'} onClose={() => setSelected(null)}>
-              <TextPropsPanel
-                el={selText}
-                canvasWidth={W}
-                allowKind={false}
-                onChange={(p) => setExtras((xs) => xs.map((x) => (x.id === selText.id ? { ...x, ...p } : x)))}
-                onDelete={() => {
-                  setExtras((xs) => xs.filter((x) => x.id !== selText.id));
-                  setSelected(null);
-                }}
-              />
+              )}
             </SettingsPanel>
           ) : (
-            <p className="hint">Chạm vào video, ảnh chèn hoặc chữ để chỉnh. Khung và chữ của khung lấy từ khung bạn chọn.</p>
+            video && <p className="hint">Chạm vào video, ảnh hoặc chữ (trên khung hình hay trên timeline) để chỉnh.</p>
           )}
         </div>
 
         <div className="side-col">
           {!video && (
-            <button className="btn primary lg block" onClick={() => videoInput.current?.click()}>
-              <Icon name="video" /> Chọn video
+            <button className="btn primary lg block" onClick={() => videoInput.current?.click()} disabled={loadingVideo}>
+              <Icon name="video" /> {loadingVideo ? 'Đang mở video…' : 'Chọn video'}
             </button>
           )}
 
@@ -576,51 +677,9 @@ export default function VideoPage() {
             </div>
           )}
 
-          <div className="panel">
-            <h3>Chèn thêm</h3>
-            <div className="row wrap">
-              <button className="btn" onClick={() => stickerInput.current?.click()}>
-                <Icon name="image" /> Chèn ảnh / logo
-              </button>
-              <button className="btn" onClick={addText}>
-                <Icon name="type" /> Thêm chữ
-              </button>
-            </div>
-          </div>
-
           {video && (
             <div className="panel">
-              <h3>Đoạn video</h3>
-              <label className="field">
-                <span className="slider-label">
-                  Bắt đầu <b>{fmt(trim.start)}</b>
-                </span>
-                <input
-                  type="range"
-                  min={0}
-                  max={duration}
-                  step={0.1}
-                  value={trim.start}
-                  onChange={(e) => {
-                    const start = Math.min(Number(e.target.value), (trim.end || duration) - 0.5);
-                    setTrim((t) => ({ ...t, start }));
-                    video.el.currentTime = start;
-                  }}
-                />
-              </label>
-              <label className="field">
-                <span className="slider-label">
-                  Kết thúc <b>{fmt(trim.end || duration)}</b>
-                </span>
-                <input
-                  type="range"
-                  min={0}
-                  max={duration}
-                  step={0.1}
-                  value={trim.end || duration}
-                  onChange={(e) => setTrim((t) => ({ ...t, end: Math.max(Number(e.target.value), t.start + 0.5) }))}
-                />
-              </label>
+              <h3>Xuất video</h3>
               <label className="check">
                 <input type="checkbox" checked={withAudio} onChange={(e) => setWithAudio(e.target.checked)} />
                 Giữ âm thanh
@@ -632,6 +691,7 @@ export default function VideoPage() {
                   <option value={720}>Nhẹ (720p)</option>
                 </select>
               </label>
+              <p className="hint">Độ dài video xuất: {fmt(clipLen)}</p>
             </div>
           )}
 

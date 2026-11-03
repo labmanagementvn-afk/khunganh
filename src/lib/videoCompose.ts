@@ -1,5 +1,6 @@
 // Ghép khung / chữ / ảnh chèn vào video và xuất file video – chạy hoàn toàn trên trình duyệt.
-// Lớp tĩnh (nền, khung, chữ, ảnh chèn) chỉ vẽ một lần; mỗi khung hình chỉ vẽ lại video ở giữa.
+// Lớp tĩnh (nền, khung, chữ của khung) và từng lớp chèn chỉ vẽ một lần; mỗi khung hình chỉ vẽ lại video
+// và dán các lớp chèn đang trong khoảng thời gian hiển thị của chúng.
 import fixWebmDuration from 'fix-webm-duration';
 import Konva from 'konva';
 import { textConfig } from '../components/TextNode';
@@ -7,15 +8,22 @@ import type { PhotoSlot, Template, TextElement } from '../types';
 import { slotClip } from './geometry';
 import { labelOf } from './compose';
 
-/** Ảnh / logo chèn lên video */
-export interface Sticker {
+/** Khoảng thời gian hiển thị (giây, theo thời gian của video gốc) */
+interface Timed {
   id: string;
-  img: HTMLImageElement;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation: number;
+  start: number;
+  end: number;
+}
+
+/** Lớp chèn lên video: ảnh / logo hoặc chữ – có thời gian hiện riêng, sắp xếp trên timeline */
+export type Overlay =
+  | (Timed & { kind: 'image'; img: HTMLImageElement; x: number; y: number; width: number; height: number; rotation: number })
+  | (Timed & { kind: 'text'; text: TextElement });
+
+/** Node Konva vẽ một lớp chèn (dùng chung cho xem trước và xuất video) */
+export function overlayNode(o: Overlay): Konva.Shape | null {
+  if (o.kind === 'image') return new Konva.Image({ image: o.img, x: o.x, y: o.y, width: o.width, height: o.height, rotation: o.rotation });
+  return o.text.text ? new Konva.Text(textConfig(o.text, o.text.text)) : null;
 }
 
 /** Vị trí video trong vùng ảnh (toạ độ canvas) */
@@ -34,8 +42,8 @@ export interface VideoScene {
   template: Template | null;
   frameImg: HTMLImageElement | null;
   values: Record<string, string>;
-  extras: TextElement[];
-  stickers: Sticker[];
+  /** Thứ tự trong mảng = thứ tự lớp (sau đè lên trước) */
+  overlays: Overlay[];
 }
 
 /**
@@ -58,7 +66,7 @@ export function pickRecorderMime(): string | null {
 export const canExportVideo = () =>
   pickRecorderMime() !== null && typeof HTMLCanvasElement !== 'undefined' && 'captureStream' in HTMLCanvasElement.prototype;
 
-/** Vẽ lớp nằm dưới video (nền, khung nếu video đè lên khung) và lớp trên (khung, chữ, ảnh chèn) */
+/** Vẽ lớp nằm dưới video (nền, khung nếu video đè lên khung), lớp trên (khung, chữ của khung) và từng lớp chèn */
 function renderLayers(scene: VideoScene, scale: number) {
   const make = (draw: (layer: Konva.Layer) => void) => {
     const stage = new Konva.Stage({
@@ -93,10 +101,34 @@ function renderLayers(scene: VideoScene, scale: number) {
       const v = t.kind === 'input' ? scene.values[labelOf(t)] ?? '' : t.text;
       if (v) layer.add(new Konva.Text(textConfig(t, v)));
     }
-    for (const s of scene.stickers) layer.add(new Konva.Image({ image: s.img, x: s.x, y: s.y, width: s.width, height: s.height, rotation: s.rotation }));
-    for (const t of scene.extras) if (t.text) layer.add(new Konva.Text(textConfig(t, t.text)));
   });
-  return { under, over };
+  // Mỗi lớp chèn: vẽ riêng rồi cắt sát theo khung bao để tiết kiệm bộ nhớ
+  const overlays = scene.overlays.flatMap((o) => {
+    const full = make((layer) => {
+      const n = overlayNode(o);
+      if (n) layer.add(n);
+    });
+    const ctx = full.getContext('2d')!;
+    const data = ctx.getImageData(0, 0, full.width, full.height).data;
+    let minX = full.width, minY = full.height, maxX = -1, maxY = -1;
+    for (let y = 0; y < full.height; y++) {
+      for (let x = 0; x < full.width; x++) {
+        if (data[(y * full.width + x) * 4 + 3]) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return [];
+    const crop = document.createElement('canvas');
+    crop.width = maxX - minX + 1;
+    crop.height = maxY - minY + 1;
+    crop.getContext('2d')!.drawImage(full, -minX, -minY);
+    return [{ canvas: crop, x: minX, y: minY, start: o.start, end: o.end }];
+  });
+  return { under, over, overlays };
 }
 
 export interface RecordOptions {
@@ -123,7 +155,7 @@ export async function recordComposite(o: RecordOptions): Promise<Blob> {
   const s = Math.min(1, o.shortSide / Math.min(scene.width, scene.height));
   const W = Math.round((scene.width * s) / 2) * 2;
   const H = Math.round((scene.height * s) / 2) * 2;
-  const { under, over } = renderLayers(scene, W / scene.width);
+  const { under, over, overlays } = renderLayers(scene, W / scene.width);
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -145,6 +177,8 @@ export async function recordComposite(o: RecordOptions): Promise<Blob> {
     ctx.drawImage(video, -video.videoWidth / 2, -video.videoHeight / 2, video.videoWidth, video.videoHeight);
     ctx.restore();
     ctx.drawImage(over, 0, 0, W, H);
+    const t = video.currentTime;
+    for (const ov of overlays) if (t >= ov.start && t < ov.end) ctx.drawImage(ov.canvas, ov.x, ov.y);
   };
 
   const stream = canvas.captureStream(30);
