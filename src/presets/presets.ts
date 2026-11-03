@@ -1,9 +1,21 @@
 import type { PhotoSlot, TextElement } from '../types';
 import { MINIMAL_PRESETS } from './presetsMinimal';
+import { PROMO_PRESETS } from './presetsPromo';
 import { arch, circle, frameSvg, leaf, roundRect, sparkle } from './svg';
 import { fixed, input } from './text';
 
-export const PRESET_CATEGORIES = ['Sản phẩm', 'Bất động sản', 'Ẩm thực', 'Thời trang', 'Làm đẹp', 'Công nghệ'] as const;
+export const PRESET_CATEGORIES = [
+  'Sản phẩm',
+  'Thời trang',
+  'Làm đẹp',
+  'Ẩm thực',
+  'Bất động sản',
+  'Công nghệ',
+  'Nội thất',
+  'Mẹ & bé',
+  'Sức khoẻ',
+  'Du lịch',
+] as const;
 export type PresetCategory = (typeof PRESET_CATEGORIES)[number];
 
 export interface Preset {
@@ -468,4 +480,5 @@ export const PRESETS: Preset[] = [
   spaNature,
   techNeon,
   ...MINIMAL_PRESETS,
+  ...PROMO_PRESETS,
 ];
