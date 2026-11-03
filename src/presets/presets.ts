@@ -1,6 +1,7 @@
 import type { PhotoSlot, TextElement } from '../types';
 import { MINIMAL_PRESETS } from './presetsMinimal';
 import { PROMO_PRESETS } from './presetsPromo';
+import { SIMPLE_PRESETS } from './presetsSimple';
 import { STYLE_PRESETS } from './presetsStyle';
 import { arch, circle, frameSvg, leaf, roundRect, sparkle } from './svg';
 import { fixed, input } from './text';
@@ -13,6 +14,7 @@ export const PRESET_CATEGORIES = [
   'Bất động sản',
   'Công nghệ',
   'Nội thất',
+  'Quà tặng',
   'Mẹ & bé',
   'Sức khoẻ',
   'Du lịch',
@@ -485,4 +487,5 @@ export const PRESETS: Preset[] = [
   ...MINIMAL_PRESETS,
   ...PROMO_PRESETS,
   ...STYLE_PRESETS,
+  ...SIMPLE_PRESETS,
 ];
