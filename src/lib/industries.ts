@@ -12,6 +12,7 @@ export const INDUSTRIES = [
   'Du lịch',
   'Giáo dục',
   'Sự kiện',
+  'Quà tặng',
   'Khác',
 ] as const;
 
