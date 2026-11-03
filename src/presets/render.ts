@@ -80,10 +80,19 @@ export async function renderPresetPreview(preset: Preset, maxSide = 480): Promis
 }
 
 const previewCache = new Map<string, Promise<string>>();
+/** Hàng đợi: vẽ lần lượt từng ảnh và nhường trình duyệt giữa các lần để trang không bị đứng */
+let queue: Promise<unknown> = Promise.resolve();
+const breathe = () =>
+  new Promise<void>((resolve) =>
+    'requestIdleCallback' in window ? requestIdleCallback(() => resolve(), { timeout: 400 }) : setTimeout(resolve, 30),
+  );
+
+/** Ảnh xem trước vẽ trên trình duyệt (dùng khi chưa có ảnh tạo sẵn) */
 export function presetPreview(preset: Preset): Promise<string> {
   let p = previewCache.get(preset.id);
   if (!p) {
-    p = renderPresetPreview(preset);
+    p = queue.then(breathe).then(() => renderPresetPreview(preset));
+    queue = p.catch(() => {});
     previewCache.set(preset.id, p);
     p.catch(() => previewCache.delete(preset.id));
   }
