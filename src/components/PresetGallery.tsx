@@ -1,23 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../lib/auth';
 import { PRESETS, PRESET_CATEGORIES, type Preset } from '../presets/presets';
 import { createTemplateFromPreset, presetPreview } from '../presets/render';
+import { presetThumbUrl } from '../presets/thumbs';
 
 function PresetCard({ preset, busy, disabled, onUse }: { preset: Preset; busy: boolean; disabled: boolean; onUse: () => void }) {
-  const [src, setSrc] = useState('');
+  // Ưu tiên ảnh tạo sẵn; nếu chưa có (mẫu mới sửa) thì vẽ trên trình duyệt khi thẻ sắp hiện ra trên màn hình
+  const [src, setSrc] = useState(() => presetThumbUrl(preset));
+  const [fallback, setFallback] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
+    if (!fallback || !ref.current) return;
     let alive = true;
-    presetPreview(preset).then((u) => alive && setSrc(u)).catch(() => {});
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        presetPreview(preset).then((u) => alive && setSrc(u)).catch(() => {});
+      },
+      { rootMargin: '400px' },
+    );
+    io.observe(ref.current);
     return () => {
       alive = false;
+      io.disconnect();
     };
-  }, [preset]);
+  }, [preset, fallback]);
 
   return (
     <div className="tpl-card">
-      <button className="tpl-thumb" onClick={onUse} disabled={disabled} title="Dùng mẫu này">
-        {src ? <img src={src} alt={preset.name} loading="lazy" /> : <span className="spinner small" />}
+      <button ref={ref} className="tpl-thumb" onClick={onUse} disabled={disabled} title="Dùng mẫu này">
+        {fallback && !src.startsWith('data:') ? (
+          <span className="spinner small" />
+        ) : (
+          <img
+            src={src}
+            alt={preset.name}
+            loading="lazy"
+            decoding="async"
+            onError={() => {
+              if (!fallback) setFallback(true);
+            }}
+          />
+        )}
       </button>
       <div className="tpl-info">
         <strong className="ellipsis">{preset.name}</strong>

@@ -110,6 +110,19 @@ publicTemplates/{id}/chunks/{n}   ảnh khung của mẫu công khai
 users/{uid}/blobs/{id}/chunks/{n} dữ liệu ảnh nhị phân
 ```
 
+### Thêm / sửa mẫu có sẵn
+
+Các mẫu nằm trong `src/presets/`. Ảnh xem trước của mẫu được tạo sẵn vào `public/preset-thumbs/` để trang chủ
+không phải vẽ hàng chục khung trên điện thoại. Sau khi thêm hoặc sửa mẫu, chạy:
+
+```bash
+npm i -D playwright && npx playwright install chromium   # chỉ cần lần đầu
+npm run thumbs
+```
+
+rồi commit cả thư mục `public/preset-thumbs/`. Nếu quên, app vẫn chạy: mẫu nào chưa có ảnh sẽ được vẽ trên
+trình duyệt khi người dùng cuộn tới.
+
 ## Công nghệ
 
 React 18 + TypeScript + Vite, [Konva](https://konvajs.org) (canvas kéo/thả), Firebase Auth + Firestore.
