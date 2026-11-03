@@ -84,6 +84,7 @@ export default function VideoPage() {
   const supported = useMemo(() => canExportVideo() || canEncodeOffline(), []);
   /** Cách xuất đang chạy: 'offline' (WebCodecs, chạy được khi chuyển tab) hoặc 'realtime' (phát và ghi lại) */
   const [exportMode, setExportMode] = useState<'offline' | 'realtime'>('offline');
+  const [exportNotice, setExportNotice] = useState('');
 
   useEffect(() => {
     store.listTemplates(uid).then(setTemplates).catch(() => {});
@@ -305,6 +306,7 @@ export default function VideoPage() {
     try {
       // Ưu tiên giải mã / mã hoá từng khung hình (không phụ thuộc tab đang mở); trình duyệt không hỗ trợ thì ghi thời gian thực
       setExportMode('offline');
+      setExportNotice('');
       let blob: Blob | null = null;
       try {
         blob = await encodeComposite({
@@ -318,6 +320,7 @@ export default function VideoPage() {
           shortSide: quality,
           withAudio,
           onProgress: (f) => setExporting(f),
+          onNotice: setExportNotice,
           signal: cancelRef.current,
         });
       } catch (e) {
@@ -327,6 +330,7 @@ export default function VideoPage() {
       if (!blob) {
         if (!canExportVideo()) throw new Error('Trình duyệt này không hỗ trợ xuất video. Hãy thử Chrome hoặc Safari mới.');
         setExportMode('realtime');
+        setExportNotice('');
         setExporting(0);
         blob = await recordComposite({
           scene,
@@ -739,6 +743,7 @@ export default function VideoPage() {
               <div className="progress">
                 <div style={{ width: `${exporting * 100}%` }} />
               </div>
+              {exportNotice && <p className="notice">{exportNotice}</p>}
               {exportMode === 'offline' ? (
                 <p className="hint">
                   Bạn có thể chuyển sang tab khác trong lúc chờ. Trên điện thoại, nếu thoát ra ứng dụng khác thì quá trình tạm dừng và tự chạy

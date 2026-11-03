@@ -75,8 +75,11 @@ export function outputSize(width: number, height: number, shortSide: number) {
   return { W: Math.round((width * s) / 2) * 2, H: Math.round((height * s) / 2) * 2 };
 }
 
-/** Bitrate theo số điểm ảnh (~0,3 bit/điểm ảnh/khung hình ở 30 fps): 1080×1080 ≈ 10 Mbps, 1080×1920 ≈ 19 Mbps */
-export const videoBitrate = (W: number, H: number) => Math.round(Math.min(50_000_000, Math.max(6_000_000, W * H * 30 * 0.3)));
+/**
+ * Bitrate theo số điểm ảnh (~0,3 bit/điểm ảnh/khung hình ở 30 fps): 1080×1080 ≈ 10 Mbps, 1080×1920 ≈ 19 Mbps.
+ * Tối đa 20 Mbps: cao hơn nữa thì mắt khó thấy khác biệt nhưng file nặng, tốn bộ nhớ và dễ làm bộ mã hoá điện thoại bị treo.
+ */
+export const videoBitrate = (W: number, H: number) => Math.round(Math.min(20_000_000, Math.max(6_000_000, W * H * 30 * 0.3)));
 
 /** Vẽ lớp nằm dưới video (nền, khung nếu video đè lên khung), lớp trên (khung, chữ của khung) và từng lớp chèn */
 export function renderLayers(scene: VideoScene, scale: number) {
